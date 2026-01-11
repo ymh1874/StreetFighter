@@ -21,6 +21,29 @@ class Particle:
         if self.timer > 0:
             pygame.draw.rect(surface, self.color, (int(self.x), int(self.y), 4, 4))
 
+class Projectile:
+    """Fireball logic"""
+    def __init__(self, x, y, direction, owner, move_data):
+        self.rect = pygame.Rect(x, y, 40, 30)
+        self.direction = direction
+        self.speed = c.FIREBALL_SPEED
+        self.owner = owner # To prevent self-damage
+        self.move_data = move_data
+        self.active = True
+        self.timer = 100 # Frames until it fizzles out
+
+    def update(self):
+        self.rect.x += self.speed * self.direction
+        self.timer -= 1
+        if self.timer <= 0:
+            self.active = False
+            
+    def draw(self, surface):
+        # Fireball Core
+        pygame.draw.circle(surface, c.YELLOW, self.rect.center, 15)
+        # Fireball Outline
+        pygame.draw.circle(surface, c.ORANGE, self.rect.center, 18, 3)
+
 class Attack:
     def __init__(self, name, damage, cooldown, hitbox_w, hitbox_h, knockback, stun):
         self.name = name
@@ -66,10 +89,10 @@ class Fighter:
             'light': Attack('Light', 5 * self.dmg_mult, 300, 60, 20, 5, 10),
             'heavy': Attack('Heavy', 12 * self.dmg_mult, 700, 70, 40, 15, 20),
             'kick': Attack('Kick', 8 * self.dmg_mult, 500, 80, 30, 10, 15),
-            'special': Attack('Special', 20 * self.dmg_mult, 2000, 120, 60, 25, 30)
+            'special': Attack('Special', 15 * self.dmg_mult, 1500, 0, 0, 25, 30) # Projectile
         }
 
-    def move(self, target, width, height):
+    def move(self, target, width, height, projectile_list):
         dx = 0
         dy = 0
         
@@ -120,25 +143,34 @@ class Fighter:
         current_time = pygame.time.get_ticks()
         if not self.attacking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
-            # PRIORITY: Special > Heavy > Kick > Light
             if key[self.controls['special']]: attack_key = 'special'
             elif key[self.controls['heavy']]: attack_key = 'heavy'
             elif key[self.controls['kick']]: attack_key = 'kick'
             elif key[self.controls['light']]: attack_key = 'light'
 
             if attack_key:
-                self.attack(target, attack_key)
+                self.attack(target, attack_key, projectile_list)
 
         self.rect.x += dx
         self.rect.y += dy
 
-    def attack(self, target, type_key):
+    def attack(self, target, type_key, projectile_list):
         self.attacking = True
         move_data = self.moves[type_key]
         self.attack_type = type_key
         self.last_attack_time = pygame.time.get_ticks()
         self.attack_cooldown = move_data.cooldown
         
+        # PROJECTILE LOGIC
+        if type_key == 'special':
+            start_x = self.rect.right if self.facing_right else self.rect.left - 40
+            direction = 1 if self.facing_right else -1
+            # Add new projectile to the shared list
+            proj = Projectile(start_x, self.rect.centery - 20, direction, self, move_data)
+            projectile_list.append(proj)
+            return False # No immediate hit
+
+        # MELEE LOGIC
         hitbox_x = self.rect.right if self.facing_right else self.rect.left - move_data.width
         hitbox_y = self.rect.y + 10
         
@@ -184,8 +216,8 @@ class Fighter:
         eye_x = self.rect.right - 15 if self.facing_right else self.rect.left + 5
         pygame.draw.rect(surface, c.BLACK, (eye_x, self.rect.y + 15, 10, 5))
         
-        # Hitbox Debug View
-        if self.attacking and self.attack_rect:
+        # Hitbox Debug View (Melee only)
+        if self.attacking and self.attack_rect and self.attack_type != 'special':
             s = pygame.Surface((self.attack_rect.width, self.attack_rect.height))
             s.set_alpha(100)
             s.fill(c.RED)

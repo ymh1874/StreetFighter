@@ -24,6 +24,9 @@ FLOOR_Y = SCREEN_HEIGHT - 100
 P_WIDTH = 50
 P_HEIGHT = 100
 
+# Combat
+FIREBALL_SPEED = 12
+
 # Character Archetypes
 CHARACTERS = [
     {'name': 'RYU-LIKE', 'color': RED, 'speed': 5, 'jump': -18, 'health': 100, 'dmg_mult': 1.0},
