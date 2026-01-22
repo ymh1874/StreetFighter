@@ -214,6 +214,58 @@ class SpinningKickEffect:
         self.hits_dealt += 1
         self.hit_cooldown = 20  # 20 frames between hits
 
+
+class HitEffect:
+    """Comic book style hit effect"""
+    def __init__(self, x, y, effect_type='light', color=None):
+        self.x = x
+        self.y = y
+        self.effect_type = effect_type
+        self.color = color or c.YELLOW
+        self.frame = 0
+        self.duration = 15
+        self.active = True
+        
+        # Text based on effect type
+        if effect_type == 'light':
+            self.text = "POW!"
+        elif effect_type == 'heavy':
+            self.text = "BOOM!"
+        elif effect_type == 'special':
+            self.text = "WHAM!"
+        elif effect_type == 'ko':
+            self.text = "K.O!"
+        else:
+            self.text = "HIT!"
+    
+    def update(self):
+        self.frame += 1
+        if self.frame >= self.duration:
+            self.active = False
+    
+    def draw(self, surface, text_renderer):
+        if not self.active:
+            return
+        
+        # Draw starburst background
+        import drawing
+        drawing.draw_hit_effect(surface, int(self.x), int(self.y), 
+                              self.effect_type, self.color, self.frame)
+        
+        # Draw text
+        scale = 1.0 + (self.duration - self.frame) * 0.05  # Shrink over time
+        alpha = int(255 * (1.0 - self.frame / self.duration))  # Fade out
+        
+        text_surf = text_renderer.render(self.text, 'medium', self.color)
+        text_x = int(self.x - text_surf.get_width() // 2)
+        text_y = int(self.y - text_surf.get_height() // 2)
+        
+        # Apply fade (simple version - draw with alpha)
+        if alpha < 255:
+            text_surf.set_alpha(alpha)
+        
+        surface.blit(text_surf, (text_x, text_y))
+
 class Attack:
     def __init__(self, name, damage, cooldown, hitbox_w, hitbox_h, knockback, stun):
         self.name = name

@@ -66,6 +66,11 @@ class Game:
         
         # Visual effects
         self.scanlines = ScanlineEffect(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+        self.screen_shake = 0
+        self.screen_shake_offset = (0, 0)
+        self.hit_effects = []  # Comic book hit effects
+        self.ko_slowdown = False
+        self.slowdown_timer = 0
         
         # Game state management
         self.state = "MAIN_MENU"  # Current game state
@@ -553,7 +558,41 @@ class Game:
         
         # Check win conditions
         if self.p1.health <= 0 or self.p2.health <= 0 or self.round_timer <= 0:
-            self.state = "GAME_OVER"
+            # Add KO effect
+            if self.p1.health <= 0:
+                from entities import HitEffect
+                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
+                self.ko_slowdown = True
+                self.slowdown_timer = 30
+            elif self.p2.health <= 0:
+                from entities import HitEffect
+                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
+                self.ko_slowdown = True
+                self.slowdown_timer = 30
+            
+            if self.slowdown_timer <= 0:
+                self.state = "GAME_OVER"
+        
+        # Slow motion on KO
+        if self.ko_slowdown:
+            self.slowdown_timer -= 1
+            if self.slowdown_timer <= 0:
+                self.ko_slowdown = False
+            # Skip update every other frame for slow motion
+            if self.slowdown_timer % 2 == 0:
+                return
+        
+        # Update screen shake
+        if self.screen_shake > 0:
+            self.screen_shake -= 1
+            import random
+            shake_amount = min(self.screen_shake, 5)
+            self.screen_shake_offset = (
+                random.randint(-shake_amount, shake_amount),
+                random.randint(-shake_amount, shake_amount)
+            )
+        else:
+            self.screen_shake_offset = (0, 0)
         
         # Update fighters and handle special moves
         result1 = self.p1.move(self.p2, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
@@ -576,7 +615,7 @@ class Game:
         self.p2.update()
         
         # Update and handle projectiles
-        from entities import Projectile
+        from entities import Projectile, HitEffect
         for proj in self.projectiles[:]:
             proj.update()
             if not proj.active:
@@ -588,10 +627,14 @@ class Game:
             if proj.owner == self.p1 and proj_rect.colliderect(self.p2.rect):
                 self.p2.take_damage(proj.damage, 10, 15, self.p1.facing_right)
                 self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
+                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
+                self.screen_shake = 8
                 proj.active = False
             elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
                 self.p1.take_damage(proj.damage, 10, 15, self.p2.facing_right)
                 self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
+                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
+                self.screen_shake = 8
                 proj.active = False
         
         # Update special effects
@@ -611,23 +654,43 @@ class Game:
                     target.take_damage(8, 15, 10, effect.fighter.facing_right)
                     effect.register_hit()
                     self._spawn_particles(target.rect.centerx, target.rect.centery, c.ORANGE)
+                    self.hit_effects.append(HitEffect(target.rect.centerx, target.rect.centery, 'heavy', c.ORANGE))
+                    self.screen_shake = 10
         
         # Spawn particles on hit
         if self.p1.attacking and self.p1.attack_rect and self.p1.attack_rect.colliderect(self.p2.rect):
             self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.RED)
+            # Add hit effect based on attack type
+            effect_type = 'heavy' if 'heavy' in self.p1.attack_type else 'light'
+            self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, effect_type, c.RED))
+            if effect_type == 'heavy':
+                self.screen_shake = 10
         if self.p2.attacking and self.p2.attack_rect and self.p2.attack_rect.colliderect(self.p1.rect):
             self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.BLUE)
+            effect_type = 'heavy' if 'heavy' in self.p2.attack_type else 'light'
+            self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, effect_type, c.BLUE))
+            if effect_type == 'heavy':
+                self.screen_shake = 10
         
         # Update particles
         for p in self.particles[:]:
             p.update()
             if p.timer <= 0:
                 self.particles.remove(p)
+        
+        # Update hit effects
+        for effect in self.hit_effects[:]:
+            effect.update()
+            if not effect.active:
+                self.hit_effects.remove(effect)
     
     def _draw_fight(self):
         """Render fight screen with vintage arcade HUD"""
+        # Apply screen shake offset
+        shake_x, shake_y = self.screen_shake_offset
+        
         # Draw brown dirt floor (no perspective grid)
-        dirt_floor = pygame.Rect(0, c.FLOOR_Y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y)
+        dirt_floor = pygame.Rect(0 + shake_x, c.FLOOR_Y + shake_y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y)
         pygame.draw.rect(self.screen, c.DIRT_BROWN, dirt_floor)
         
         # Add subtle texture with random darker spots
@@ -638,18 +701,28 @@ class Game:
             spot_y = random.randint(c.FLOOR_Y, c.SCREEN_HEIGHT)
             spot_size = random.randint(3, 8)
             darker_brown = (int(c.DIRT_BROWN[0] * 0.8), int(c.DIRT_BROWN[1] * 0.8), int(c.DIRT_BROWN[2] * 0.8))
-            pygame.draw.circle(self.screen, darker_brown, (spot_x, spot_y), spot_size)
+            pygame.draw.circle(self.screen, darker_brown, (spot_x + shake_x, spot_y + shake_y), spot_size)
         
         # Floor line
-        pygame.draw.line(self.screen, (100, 60, 25), (0, c.FLOOR_Y), (c.SCREEN_WIDTH, c.FLOOR_Y), 3)
+        pygame.draw.line(self.screen, (100, 60, 25), (0 + shake_x, c.FLOOR_Y + shake_y), 
+                        (c.SCREEN_WIDTH + shake_x, c.FLOOR_Y + shake_y), 3)
+        
+        # Create shaken surface for game objects
+        if self.screen_shake > 0:
+            # Draw everything to a temporary surface then blit with offset
+            game_surface = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT), pygame.SRCALPHA)
+            game_surface.fill((0, 0, 0, 0))
+        else:
+            game_surface = self.screen
+            shake_x, shake_y = 0, 0
         
         # Draw fighters
-        self.p1.draw(self.screen)
-        self.p2.draw(self.screen)
+        self.p1.draw(game_surface)
+        self.p2.draw(game_surface)
         
         # Draw projectiles
         for proj in self.projectiles:
-            proj.draw(self.screen)
+            proj.draw(game_surface)
         
         # Draw special effects (spinning kick rotation)
         from entities import SpinningKickEffect
@@ -662,29 +735,78 @@ class Game:
         
         # Draw particles
         for p in self.particles:
-            p.draw(self.screen)
+            p.draw(game_surface)
         
-        # Draw HUD
+        # Draw hit effects
+        for effect in self.hit_effects:
+            effect.draw(game_surface, self.text_renderer)
+        
+        # Blit shaken surface if needed
+        if self.screen_shake > 0:
+            self.screen.blit(game_surface, (shake_x, shake_y))
+        
+        # Draw HUD (not affected by shake)
         self._draw_fight_hud()
     
     def _draw_fight_hud(self):
-        """Draw vintage arcade-style HUD"""
+        """Draw vintage arcade-style HUD with segmented health bars"""
         bar_width = 300
         bar_height = 30
+        num_segments = 10
+        segment_width = (bar_width - (num_segments - 1) * 2) / num_segments  # 2px gap between segments
         
-        # P1 health bar
+        # P1 health bar (segmented)
         ratio_p1 = max(0, self.p1.health / self.p1.max_health)
         pygame.draw.rect(self.screen, c.BLACK, (18, 18, bar_width + 4, bar_height + 4))
         pygame.draw.rect(self.screen, c.DARK_GRAY, (20, 20, bar_width, bar_height))
-        pygame.draw.rect(self.screen, c.RED, (20, 20, bar_width * ratio_p1, bar_height))
+        
+        # Draw segments
+        for i in range(num_segments):
+            segment_x = 20 + i * (segment_width + 2)
+            segment_health = (i + 1) / num_segments
+            
+            if ratio_p1 >= segment_health:
+                # Full segment
+                color = c.RED
+            elif ratio_p1 > (i / num_segments):
+                # Partial segment
+                color = c.RED
+            else:
+                # Empty segment (already dark gray background)
+                continue
+            
+            # Flash on low health
+            if ratio_p1 < 0.3 and pygame.time.get_ticks() % 500 < 250:
+                color = c.YELLOW
+            
+            pygame.draw.rect(self.screen, color, (segment_x, 20, segment_width, bar_height))
+        
         pygame.draw.rect(self.screen, c.WHITE, (20, 20, bar_width, bar_height), 3)
         
-        # P2 health bar
+        # P2 health bar (segmented)
         ratio_p2 = max(0, self.p2.health / self.p2.max_health)
         p2_x = c.SCREEN_WIDTH - 20 - bar_width
         pygame.draw.rect(self.screen, c.BLACK, (p2_x - 2, 18, bar_width + 4, bar_height + 4))
         pygame.draw.rect(self.screen, c.DARK_GRAY, (p2_x, 20, bar_width, bar_height))
-        pygame.draw.rect(self.screen, c.BLUE, (p2_x, 20, bar_width * ratio_p2, bar_height))
+        
+        # Draw segments
+        for i in range(num_segments):
+            segment_x = p2_x + i * (segment_width + 2)
+            segment_health = (i + 1) / num_segments
+            
+            if ratio_p2 >= segment_health:
+                color = c.BLUE
+            elif ratio_p2 > (i / num_segments):
+                color = c.BLUE
+            else:
+                continue
+            
+            # Flash on low health
+            if ratio_p2 < 0.3 and pygame.time.get_ticks() % 500 < 250:
+                color = c.YELLOW
+            
+            pygame.draw.rect(self.screen, color, (segment_x, 20, segment_width, bar_height))
+        
         pygame.draw.rect(self.screen, c.WHITE, (p2_x, 20, bar_width, bar_height), 3)
         
         # Player names
