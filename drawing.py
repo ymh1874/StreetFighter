@@ -244,8 +244,13 @@ def draw_hammoud(surface, x, y, facing_right, animation_state='idle', frame=0):
     pygame.draw.rect(surface, c.BLACK, glass_rect, 1)
     # Lens
     pygame.draw.rect(surface, c.WHITE, (head_x + glass_offset - 4, head_y - 3, 8, 4))
-    # Bridge
-    pygame.draw.line(surface, c.BLACK, (head_x + glass_offset - 5, head_y - 1), (head_x - glass_offset + 5, head_y - 1), 1)
+    # Bridge (connect left and right sides)
+    if facing_right:
+        pygame.draw.line(surface, c.BLACK, (head_x + glass_offset - 5, head_y - 1), 
+                        (head_x - 5, head_y - 1), 1)
+    else:
+        pygame.draw.line(surface, c.BLACK, (head_x + glass_offset + 5, head_y - 1), 
+                        (head_x + 5, head_y - 1), 1)
     
     # Eyes behind glasses
     pygame.draw.circle(surface, c.BLACK, (head_x + glass_offset, head_y - 1), 1)

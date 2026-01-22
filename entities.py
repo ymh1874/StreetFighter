@@ -2,6 +2,7 @@ import pygame
 import math
 import config as c
 from combat import FrameData, CombatSystem, SpecialMoveData
+import drawing
 
 class Particle:
     """Simple hit particle effect"""
@@ -512,8 +513,6 @@ class Fighter:
         self.animation_frame += 1
 
     def draw(self, surface):
-        import drawing
-        
         # Shadow
         pygame.draw.ellipse(surface, (20,20,20), (self.rect.centerx - 25, c.FLOOR_Y - 10, 50, 20))
         

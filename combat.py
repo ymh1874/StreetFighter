@@ -224,6 +224,8 @@ def check_combo_string(attack_history, combo_string):
 
 
 # Character-specific combo definitions
+# NOTE: These combo strings are defined for future enhancement
+# They can be implemented to provide bonus damage when specific attack sequences are performed
 COMBO_STRINGS = {
     'PROF. KHALID': {
         'tornado_kick': {

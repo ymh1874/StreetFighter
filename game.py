@@ -72,6 +72,10 @@ class Game:
         self.ko_slowdown = False
         self.slowdown_timer = 0
         
+        # Set random seed for consistent ground texture
+        import random
+        random.seed(42)
+        
         # Game state management
         self.state = "MAIN_MENU"  # Current game state
         self.running = True
@@ -693,9 +697,8 @@ class Game:
         dirt_floor = pygame.Rect(0 + shake_x, c.FLOOR_Y + shake_y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y)
         pygame.draw.rect(self.screen, c.DIRT_BROWN, dirt_floor)
         
-        # Add subtle texture with random darker spots
+        # Add subtle texture with random darker spots (using consistent seed from __init__)
         import random
-        random.seed(42)  # Consistent texture
         for _ in range(50):
             spot_x = random.randint(0, c.SCREEN_WIDTH)
             spot_y = random.randint(c.FLOOR_Y, c.SCREEN_HEIGHT)
