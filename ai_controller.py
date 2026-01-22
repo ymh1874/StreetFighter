@@ -19,7 +19,15 @@ class AIController:
         
         Args:
             difficulty: 'easy', 'medium', or 'hard'
+        
+        Raises:
+            ValueError: If difficulty is not one of the valid options
         """
+        # Validate difficulty
+        valid_difficulties = ['easy', 'medium', 'hard']
+        if difficulty not in valid_difficulties:
+            raise ValueError(f"Invalid difficulty '{difficulty}'. Must be one of {valid_difficulties}")
+        
         self.difficulty = difficulty
         
         # Difficulty settings
