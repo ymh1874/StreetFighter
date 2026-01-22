@@ -46,6 +46,10 @@ class Fighter:
         self.health = self.max_health
         self.dmg_mult = stats['dmg_mult']
         
+        # Power Bar System
+        self.max_power = 100
+        self.power = 0
+        
         # Movement State
         self.vel_y = 0
         self.jumping = False
@@ -60,6 +64,10 @@ class Fighter:
         self.last_attack_time = 0
         self.attack_rect = None
         self.color_flash = 0 
+        
+        # Combo System
+        self.combo_count = 0
+        self.last_hit_time = 0
 
         # Attack Definitions
         self.moves = {
@@ -145,15 +153,40 @@ class Fighter:
         self.attack_rect = pygame.Rect(hitbox_x, hitbox_y, move_data.width, move_data.height)
         
         if self.attack_rect.colliderect(target.rect):
-            target.take_damage(move_data.damage, move_data.knockback, move_data.stun, self.facing_right)
+            # Check if this continues a combo
+            current_time = pygame.time.get_ticks()
+            if current_time - self.last_hit_time < 2000:  # 2 second window
+                self.combo_count += 1
+            else:
+                self.combo_count = 1
+            
+            self.last_hit_time = current_time
+            
+            # Apply damage and gain power
+            target.take_damage(move_data.damage, move_data.knockback, move_data.stun, self.facing_right, self)
+            
+            # Gain power for landing hit
+            self.gain_power(5 if type_key == 'light' else 10)
+            
             return True 
+        else:
+            # Reset combo on miss
+            self.combo_count = 0
         return False 
 
-    def take_damage(self, amount, knockback, stun, attacker_facing_right):
+    def take_damage(self, amount, knockback, stun, attacker_facing_right, attacker=None):
         self.health -= amount
         self.hit_stun = stun
         self.attacking = False 
         self.color_flash = 5 
+        
+        # Gain power when hit (defensive gain) - only if we have power bar
+        if hasattr(self, 'power'):
+            self.gain_power(8)
+        
+        # Reset combo when hit - only if we have combo system
+        if hasattr(self, 'combo_count'):
+            self.combo_count = 0
         
         direction = 1 if attacker_facing_right else -1
         self.rect.x += knockback * direction * 2 
@@ -161,6 +194,10 @@ class Fighter:
         if self.health <= 0:
             self.health = 0
             self.alive = False
+    
+    def gain_power(self, amount):
+        """Gain power for special moves"""
+        self.power = min(self.max_power, self.power + amount)
 
     def update(self):
         if self.attacking:

@@ -575,6 +575,7 @@ class Game:
         """Draw vintage arcade-style HUD"""
         bar_width = 300
         bar_height = 30
+        power_bar_height = 15
         
         # P1 health bar
         ratio_p1 = max(0, self.p1.health / self.p1.max_health)
@@ -582,6 +583,14 @@ class Game:
         pygame.draw.rect(self.screen, c.DARK_GRAY, (20, 20, bar_width, bar_height))
         pygame.draw.rect(self.screen, c.RED, (20, 20, bar_width * ratio_p1, bar_height))
         pygame.draw.rect(self.screen, c.WHITE, (20, 20, bar_width, bar_height), 3)
+        
+        # P1 power bar
+        power_ratio_p1 = max(0, self.p1.power / self.p1.max_power)
+        power_y = 55
+        pygame.draw.rect(self.screen, c.BLACK, (18, power_y - 2, bar_width + 4, power_bar_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (20, power_y, bar_width, power_bar_height))
+        pygame.draw.rect(self.screen, c.YELLOW, (20, power_y, bar_width * power_ratio_p1, power_bar_height))
+        pygame.draw.rect(self.screen, c.ORANGE, (20, power_y, bar_width, power_bar_height), 2)
         
         # P2 health bar
         ratio_p2 = max(0, self.p2.health / self.p2.max_health)
@@ -591,12 +600,29 @@ class Game:
         pygame.draw.rect(self.screen, c.BLUE, (p2_x, 20, bar_width * ratio_p2, bar_height))
         pygame.draw.rect(self.screen, c.WHITE, (p2_x, 20, bar_width, bar_height), 3)
         
-        # Player names
-        p1_name = self.text_renderer.render(self.p1.stats['name'], 'medium', c.WHITE)
-        self.screen.blit(p1_name, (25, 55))
+        # P2 power bar
+        power_ratio_p2 = max(0, self.p2.power / self.p2.max_power)
+        pygame.draw.rect(self.screen, c.BLACK, (p2_x - 2, power_y - 2, bar_width + 4, power_bar_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (p2_x, power_y, bar_width, power_bar_height))
+        pygame.draw.rect(self.screen, c.YELLOW, (p2_x, power_y, bar_width * power_ratio_p2, power_bar_height))
+        pygame.draw.rect(self.screen, c.ORANGE, (p2_x, power_y, bar_width, power_bar_height), 2)
         
-        p2_name = self.text_renderer.render(self.p2.stats['name'], 'medium', c.WHITE)
-        self.screen.blit(p2_name, (p2_x, 55))
+        # Player names
+        p1_name = self.text_renderer.render(self.p1.stats['name'], 'small', c.WHITE)
+        self.screen.blit(p1_name, (25, 75))
+        
+        p2_name = self.text_renderer.render(self.p2.stats['name'], 'small', c.WHITE)
+        self.screen.blit(p2_name, (p2_x, 75))
+        
+        # Combo counters
+        if self.p1.combo_count > 1:
+            combo_text = self.text_renderer.render(f"{self.p1.combo_count} HIT COMBO!", 'medium', c.YELLOW)
+            self.screen.blit(combo_text, (25, 95))
+        
+        if self.p2.combo_count > 1:
+            combo_text = self.text_renderer.render(f"{self.p2.combo_count} HIT COMBO!", 'medium', c.YELLOW)
+            combo_x = p2_x + bar_width - combo_text.get_width()
+            self.screen.blit(combo_text, (combo_x, 95))
         
         # Timer
         t_color = c.WHITE if self.round_timer > 10 else c.RED
