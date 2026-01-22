@@ -126,6 +126,8 @@ class Game:
         self.round_timer = 99
         self.last_timer_update = 0
         self.particles = []
+        self.projectiles = []
+        self.special_effects = []
     
     # ==================== GAME LOOP ====================
     
@@ -332,15 +334,17 @@ class Game:
         
         controls_p1 = [
             "MOVE: W/A/S/D",
-            "LIGHT ATTACK: J",
-            "HEAVY ATTACK: K",
-            "KICK: L",
-            "SPECIAL: I"
+            "LIGHT PUNCH: J",
+            "HEAVY PUNCH: K",
+            "LIGHT KICK: L",
+            "HEAVY KICK: I",
+            "SPECIAL: U",
+            "DASH: LEFT SHIFT"
         ]
         
         for i, control in enumerate(controls_p1):
             text = self.text_renderer.render(control, 'small', c.WHITE)
-            self.screen.blit(text, (170, y_offset + 40 + i * 30))
+            self.screen.blit(text, (170, y_offset + 40 + i * 25))
         
         # Player 2 controls
         p2_title = self.text_renderer.render("PLAYER 2", 'medium', c.BLUE)
@@ -348,15 +352,17 @@ class Game:
         
         controls_p2 = [
             "MOVE: ARROW KEYS",
-            "LIGHT ATTACK: NUMPAD 1",
-            "HEAVY ATTACK: NUMPAD 2",
-            "KICK: NUMPAD 3",
-            "SPECIAL: NUMPAD 0"
+            "LIGHT PUNCH: NUMPAD 1",
+            "HEAVY PUNCH: NUMPAD 2",
+            "LIGHT KICK: NUMPAD 3",
+            "HEAVY KICK: NUMPAD 4",
+            "SPECIAL: NUMPAD 0",
+            "DASH: RIGHT SHIFT"
         ]
         
         for i, control in enumerate(controls_p2):
             text = self.text_renderer.render(control, 'small', c.WHITE)
-            self.screen.blit(text, (470, y_offset + 40 + i * 30))
+            self.screen.blit(text, (470, y_offset + 40 + i * 25))
         
         # Back button
         self.controls_back_button.draw(self.screen, self.text_renderer)
@@ -500,13 +506,27 @@ class Game:
         """Initialize a new fight with selected characters"""
         # P1 controls
         controls_p1 = {
-            'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w,
-            'light': pygame.K_j, 'heavy': pygame.K_k, 'kick': pygame.K_l, 'special': pygame.K_i
+            'left': pygame.K_a, 
+            'right': pygame.K_d, 
+            'jump': pygame.K_w,
+            'light_punch': pygame.K_j, 
+            'heavy_punch': pygame.K_k, 
+            'light_kick': pygame.K_l, 
+            'heavy_kick': pygame.K_i,
+            'special': pygame.K_u,
+            'dash': pygame.K_LSHIFT
         }
         # P2 controls
         controls_p2 = {
-            'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP,
-            'light': pygame.K_KP1, 'heavy': pygame.K_KP2, 'kick': pygame.K_KP3, 'special': pygame.K_KP0
+            'left': pygame.K_LEFT, 
+            'right': pygame.K_RIGHT, 
+            'jump': pygame.K_UP,
+            'light_punch': pygame.K_KP1, 
+            'heavy_punch': pygame.K_KP2, 
+            'light_kick': pygame.K_KP3, 
+            'heavy_kick': pygame.K_KP4,
+            'special': pygame.K_KP0,
+            'dash': pygame.K_RSHIFT
         }
         
         # Create fighters
@@ -519,6 +539,8 @@ class Game:
         # Reset fight variables
         self.round_timer = 99
         self.particles = []
+        self.projectiles = []  # Add projectiles list
+        self.special_effects = []  # Add special effects list
         self.state = "FIGHT"
         self.last_timer_update = pygame.time.get_ticks()
     
@@ -533,11 +555,62 @@ class Game:
         if self.p1.health <= 0 or self.p2.health <= 0 or self.round_timer <= 0:
             self.state = "GAME_OVER"
         
-        # Update fighters
-        self.p1.move(self.p2, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-        self.p2.move(self.p1, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+        # Update fighters and handle special moves
+        result1 = self.p1.move(self.p2, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+        result2 = self.p2.move(self.p1, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+        
+        # Handle special move results
+        for result in [result1, result2]:
+            if result is not None:
+                if isinstance(result, list):
+                    # Multiple projectiles (pizza throw)
+                    self.projectiles.extend(result)
+                elif isinstance(result, SpinningKickEffect):
+                    # Special effect (spinning kick)
+                    self.special_effects.append(result)
+                elif hasattr(result, 'active'):
+                    # Single projectile
+                    self.projectiles.append(result)
+        
         self.p1.update()
         self.p2.update()
+        
+        # Update and handle projectiles
+        from entities import Projectile
+        for proj in self.projectiles[:]:
+            proj.update()
+            if not proj.active:
+                self.projectiles.remove(proj)
+                continue
+            
+            # Check collision with fighters
+            proj_rect = proj.get_rect()
+            if proj.owner == self.p1 and proj_rect.colliderect(self.p2.rect):
+                self.p2.take_damage(proj.damage, 10, 15, self.p1.facing_right)
+                self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
+                proj.active = False
+            elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
+                self.p1.take_damage(proj.damage, 10, 15, self.p2.facing_right)
+                self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
+                proj.active = False
+        
+        # Update special effects
+        from entities import SpinningKickEffect
+        for effect in self.special_effects[:]:
+            effect.update()
+            if not effect.active:
+                self.special_effects.remove(effect)
+                continue
+            
+            # Check for spinning kick hits
+            if isinstance(effect, SpinningKickEffect) and effect.can_hit():
+                target = self.p2 if effect.fighter == self.p1 else self.p1
+                kick_rect = pygame.Rect(effect.fighter.rect.x - 30, effect.fighter.rect.y - 30, 
+                                       effect.fighter.rect.width + 60, effect.fighter.rect.height + 60)
+                if kick_rect.colliderect(target.rect):
+                    target.take_damage(8, 15, 10, effect.fighter.facing_right)
+                    effect.register_hit()
+                    self._spawn_particles(target.rect.centerx, target.rect.centery, c.ORANGE)
         
         # Spawn particles on hit
         if self.p1.attacking and self.p1.attack_rect and self.p1.attack_rect.colliderect(self.p2.rect):
@@ -553,16 +626,39 @@ class Game:
     
     def _draw_fight(self):
         """Render fight screen with vintage arcade HUD"""
-        # Draw retro grid floor
-        pygame.draw.rect(self.screen, (20, 20, 30), (0, c.FLOOR_Y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y))
-        for x in range(0, c.SCREEN_WIDTH, 50):
-            pygame.draw.line(self.screen, (50, 50, 100), (x, c.FLOOR_Y), 
-                           (x - (x - c.SCREEN_WIDTH // 2), c.SCREEN_HEIGHT), 1)
-        pygame.draw.line(self.screen, c.WHITE, (0, c.FLOOR_Y), (c.SCREEN_WIDTH, c.FLOOR_Y), 2)
+        # Draw brown dirt floor (no perspective grid)
+        dirt_floor = pygame.Rect(0, c.FLOOR_Y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y)
+        pygame.draw.rect(self.screen, c.DIRT_BROWN, dirt_floor)
+        
+        # Add subtle texture with random darker spots
+        import random
+        random.seed(42)  # Consistent texture
+        for _ in range(50):
+            spot_x = random.randint(0, c.SCREEN_WIDTH)
+            spot_y = random.randint(c.FLOOR_Y, c.SCREEN_HEIGHT)
+            spot_size = random.randint(3, 8)
+            darker_brown = (int(c.DIRT_BROWN[0] * 0.8), int(c.DIRT_BROWN[1] * 0.8), int(c.DIRT_BROWN[2] * 0.8))
+            pygame.draw.circle(self.screen, darker_brown, (spot_x, spot_y), spot_size)
+        
+        # Floor line
+        pygame.draw.line(self.screen, (100, 60, 25), (0, c.FLOOR_Y), (c.SCREEN_WIDTH, c.FLOOR_Y), 3)
         
         # Draw fighters
         self.p1.draw(self.screen)
         self.p2.draw(self.screen)
+        
+        # Draw projectiles
+        for proj in self.projectiles:
+            proj.draw(self.screen)
+        
+        # Draw special effects (spinning kick rotation)
+        from entities import SpinningKickEffect
+        for effect in self.special_effects:
+            if isinstance(effect, SpinningKickEffect):
+                # Draw rotation effect
+                angle = effect.get_rotation_angle()
+                # Visual feedback - could draw motion lines
+                pass
         
         # Draw particles
         for p in self.particles:

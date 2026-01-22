@@ -1,5 +1,7 @@
 import pygame
+import math
 import config as c
+from combat import FrameData, CombatSystem, SpecialMoveData
 
 class Particle:
     """Simple hit particle effect"""
@@ -20,6 +22,197 @@ class Particle:
     def draw(self, surface):
         if self.timer > 0:
             pygame.draw.rect(surface, self.color, (int(self.x), int(self.y), 4, 4))
+
+
+class Projectile:
+    """Base projectile class"""
+    def __init__(self, x, y, damage, vel_x, vel_y, owner):
+        self.x = x
+        self.y = y
+        self.damage = damage
+        self.vel_x = vel_x
+        self.vel_y = vel_y
+        self.owner = owner  # Fighter who shot it
+        self.active = True
+        self.frame = 0
+        
+    def update(self):
+        """Update projectile position"""
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.frame += 1
+        
+        # Deactivate if off screen
+        if self.x < -50 or self.x > c.SCREEN_WIDTH + 50:
+            self.active = False
+        if self.y < -50 or self.y > c.SCREEN_HEIGHT + 50:
+            self.active = False
+    
+    def get_rect(self):
+        """Get collision rectangle"""
+        return pygame.Rect(self.x - 10, self.y - 10, 20, 20)
+    
+    def draw(self, surface):
+        """Override in subclass"""
+        pass
+
+
+class PizzaSlice(Projectile):
+    """Eduardo's pizza slice projectile"""
+    def __init__(self, x, y, vel_x, vel_y, owner, delay=0):
+        super().__init__(x, y, 6, vel_x, vel_y, owner)
+        self.rotation = 0
+        self.delay = delay  # Delay before becoming active
+        self.gravity = 0.2
+        
+    def update(self):
+        # Wait for delay
+        if self.delay > 0:
+            self.delay -= 1
+            self.frame += 1
+            return
+            
+        # Parabolic arc
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.vel_y += self.gravity
+        
+        # Rotation
+        self.rotation = (self.rotation + 15) % 360
+        self.frame += 1
+        
+        # Deactivate if off screen
+        if self.x < -50 or self.x > c.SCREEN_WIDTH + 50:
+            self.active = False
+        if self.y > c.SCREEN_HEIGHT + 50:
+            self.active = False
+    
+    def draw(self, surface):
+        import drawing
+        if self.delay <= 0:  # Only draw if active
+            drawing.draw_pizza_slice(surface, self.x, self.y, self.rotation)
+
+
+class SineWaveFireball(Projectile):
+    """Hasan's sine wave fireball"""
+    def __init__(self, x, y, direction, owner):
+        speed = 8
+        vel_x = speed * direction
+        super().__init__(x, y, 15, vel_x, 0, owner)
+        self.start_y = y
+        self.distance_traveled = 0
+        self.amplitude = 30
+        self.wavelength = 50
+        
+    def update(self):
+        # Horizontal movement
+        self.x += self.vel_x
+        self.distance_traveled += abs(self.vel_x)
+        
+        # Vertical oscillation (sine wave)
+        self.y = self.start_y + self.amplitude * math.sin(self.distance_traveled / self.wavelength)
+        
+        self.frame += 1
+        
+        # Deactivate if off screen
+        if self.x < -50 or self.x > c.SCREEN_WIDTH + 50:
+            self.active = False
+    
+    def draw(self, surface):
+        import drawing
+        drawing.draw_fireball(surface, self.x, self.y, self.frame)
+
+
+class HomingCircuitBoard(Projectile):
+    """Hammoud's homing circuit board"""
+    def __init__(self, x, y, direction, owner, target):
+        speed = 4
+        vel_x = speed * direction
+        super().__init__(x, y, 20, vel_x, 0, owner)
+        self.target = target
+        self.homing_strength = 0.05
+        
+    def update(self):
+        # Calculate angle to target
+        if self.target and self.target.alive:
+            dx = self.target.rect.centerx - self.x
+            dy = self.target.rect.centery - self.y
+            target_angle = math.atan2(dy, dx)
+            
+            # Current angle
+            current_angle = math.atan2(self.vel_y, self.vel_x)
+            
+            # Gradually adjust toward target
+            angle_diff = target_angle - current_angle
+            # Normalize angle difference to [-pi, pi]
+            while angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
+            
+            # Apply correction (limited turning speed)
+            correction = max(-self.homing_strength, min(self.homing_strength, angle_diff))
+            new_angle = current_angle + correction
+            
+            # Update velocity
+            speed = 4
+            self.vel_x = speed * math.cos(new_angle)
+            self.vel_y = speed * math.sin(new_angle)
+        
+        # Move
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.frame += 1
+        
+        # Deactivate if off screen
+        if self.x < -50 or self.x > c.SCREEN_WIDTH + 50:
+            self.active = False
+        if self.y < -50 or self.y > c.SCREEN_HEIGHT + 50:
+            self.active = False
+    
+    def draw(self, surface):
+        import drawing
+        drawing.draw_circuit_board(surface, self.x, self.y, self.frame)
+
+
+class SpinningKickEffect:
+    """Visual effect for Khalid's spinning kick"""
+    def __init__(self, fighter, duration=60):
+        self.fighter = fighter
+        self.duration = duration
+        self.frame = 0
+        self.active = True
+        self.start_x = fighter.rect.x
+        self.hits_dealt = 0
+        self.hit_cooldown = 0
+        
+    def update(self):
+        self.frame += 1
+        if self.frame >= self.duration:
+            self.active = False
+            
+        if self.hit_cooldown > 0:
+            self.hit_cooldown -= 1
+        
+        # Move fighter forward
+        direction = 1 if self.fighter.facing_right else -1
+        move_per_frame = 150 / 60  # Total movement / duration
+        self.fighter.rect.x += move_per_frame * direction
+    
+    def get_rotation_angle(self):
+        """Get current rotation angle for visual"""
+        # 3 full rotations over duration
+        progress = self.frame / self.duration
+        return progress * 360 * 3
+    
+    def can_hit(self):
+        """Check if can deal another hit"""
+        return self.hits_dealt < 3 and self.hit_cooldown <= 0
+    
+    def register_hit(self):
+        """Register that a hit was dealt"""
+        self.hits_dealt += 1
+        self.hit_cooldown = 20  # 20 frames between hits
 
 class Attack:
     def __init__(self, name, damage, cooldown, hitbox_w, hitbox_h, knockback, stun):
@@ -58,17 +251,37 @@ class Fighter:
         self.attack_cooldown = 0
         self.hit_stun = 0
         self.last_attack_time = 0
+        self.attack_start_frame = 0
         self.attack_rect = None
-        self.color_flash = 0 
+        self.color_flash = 0
+        self.animation_state = 'idle'
+        self.animation_frame = 0
+        self.special_move_cooldown = 0
+        self.last_special_time = 0
+        
+        # Attack history for combos
+        self.attack_history = []
 
         # Attack Definitions
         self.moves = {
-            'light': Attack('Light', 5 * self.dmg_mult, 300, 60, 20, 5, 10),
-            'heavy': Attack('Heavy', 12 * self.dmg_mult, 700, 70, 40, 15, 20),
-            'kick': Attack('Kick', 8 * self.dmg_mult, 500, 80, 30, 10, 15),
+            'light_punch': Attack('Light Punch', 5 * self.dmg_mult, 300, 60, 20, 5, 10),
+            'heavy_punch': Attack('Heavy Punch', 12 * self.dmg_mult, 700, 70, 40, 15, 20),
+            'light_kick': Attack('Light Kick', 8 * self.dmg_mult, 500, 80, 30, 10, 15),
+            'heavy_kick': Attack('Heavy Kick', 15 * self.dmg_mult, 900, 90, 40, 20, 25),
             'special': Attack('Special', 20 * self.dmg_mult, 2000, 120, 60, 25, 30)
         }
 
+    def can_move(self):
+        """Determine if fighter can move based on current state"""
+        if not self.attacking:
+            return True
+        
+        # Check frame data
+        current_time = pygame.time.get_ticks()
+        frames_elapsed = (current_time - self.attack_start_frame) / (1000 / 60)  # Convert to frames
+        
+        return FrameData.can_move_during_attack(self.attack_type, frames_elapsed)
+    
     def move(self, target, width, height):
         dx = 0
         dy = 0
@@ -89,8 +302,8 @@ class Fighter:
 
         key = pygame.key.get_pressed()
 
-        # Input Handling
-        if not self.attacking:
+        # Input Handling - can move during light attacks
+        if self.can_move():
             if key[self.controls['left']]:
                 dx = -self.speed
                 self.facing_right = False
@@ -120,25 +333,55 @@ class Fighter:
         current_time = pygame.time.get_ticks()
         if not self.attacking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
-            # PRIORITY: Special > Heavy > Kick > Light
-            if key[self.controls['special']]: attack_key = 'special'
-            elif key[self.controls['heavy']]: attack_key = 'heavy'
-            elif key[self.controls['kick']]: attack_key = 'kick'
-            elif key[self.controls['light']]: attack_key = 'light'
+            # PRIORITY: Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
+            if key[self.controls['special']]: 
+                attack_key = 'special'
+            elif key[self.controls.get('heavy_kick', pygame.K_i)]: 
+                attack_key = 'heavy_kick'
+            elif key[self.controls.get('heavy_punch', pygame.K_k)]: 
+                attack_key = 'heavy_punch'
+            elif key[self.controls.get('light_kick', pygame.K_l)]: 
+                attack_key = 'light_kick'
+            elif key[self.controls.get('light_punch', pygame.K_j)]: 
+                attack_key = 'light_punch'
 
             if attack_key:
-                self.attack(target, attack_key)
+                return_val = self.attack(target, attack_key)
+                if return_val is not None:  # Special move returned projectile
+                    return return_val
 
         self.rect.x += dx
         self.rect.y += dy
+        return None
 
     def attack(self, target, type_key):
         self.attacking = True
-        move_data = self.moves[type_key]
+        move_data = self.moves.get(type_key)
+        if not move_data:
+            return None
+            
         self.attack_type = type_key
         self.last_attack_time = pygame.time.get_ticks()
+        self.attack_start_frame = self.last_attack_time
         self.attack_cooldown = move_data.cooldown
+        self.animation_state = type_key
         
+        # Add to attack history for combos
+        self.attack_history.append(type_key)
+        if len(self.attack_history) > 10:
+            self.attack_history.pop(0)
+        
+        # Handle special moves separately
+        if type_key == 'special':
+            current_time = pygame.time.get_ticks()
+            if current_time - self.last_special_time >= 2000:
+                self.last_special_time = current_time
+                return self.execute_special_move(target)
+            else:
+                self.attacking = False
+                return None
+        
+        # Regular attacks
         hitbox_x = self.rect.right if self.facing_right else self.rect.left - move_data.width
         hitbox_y = self.rect.y + 10
         
@@ -147,7 +390,44 @@ class Fighter:
         if self.attack_rect.colliderect(target.rect):
             target.take_damage(move_data.damage, move_data.knockback, move_data.stun, self.facing_right)
             return True 
-        return False 
+        return False
+    
+    def execute_special_move(self, target):
+        """Execute character-specific special move"""
+        special_type = self.stats.get('special', '')
+        direction = 1 if self.facing_right else -1
+        
+        if special_type == 'spinning_kick':
+            # Khalid's spinning kick - returns effect object
+            return SpinningKickEffect(self, duration=60)
+        
+        elif special_type == 'pizza_throw':
+            # Eduardo's pizza throw - returns 3 projectiles
+            projectiles = []
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            
+            for i in range(3):
+                vel_x = 5 * direction
+                vel_y = -8 + i * 2  # Slightly different trajectories
+                pizza = PizzaSlice(start_x, start_y, vel_x, vel_y, self, delay=i * 5)
+                projectiles.append(pizza)
+            
+            return projectiles
+        
+        elif special_type == 'fireball':
+            # Hasan's fireball
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            return SineWaveFireball(start_x, start_y, direction, self)
+        
+        elif special_type == 'circuit_board':
+            # Hammoud's homing circuit board
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            return HomingCircuitBoard(start_x, start_y, direction, self, target)
+        
+        return None 
 
     def take_damage(self, amount, knockback, stun, attacker_facing_right):
         self.health -= amount
@@ -164,27 +444,50 @@ class Fighter:
 
     def update(self):
         if self.attacking:
-            # Animation duration override
-            if pygame.time.get_ticks() - self.last_attack_time > 200:
+            # Use frame data for attack duration
+            current_time = pygame.time.get_ticks()
+            frames_elapsed = (current_time - self.attack_start_frame) / (1000 / 60)
+            
+            duration = FrameData.get_attack_duration(self.attack_type)
+            if frames_elapsed >= duration:
                 self.attacking = False
                 self.attack_rect = None
+                self.animation_state = 'idle'
 
         if self.color_flash > 0:
             self.color_flash -= 1
+        
+        self.animation_frame += 1
 
     def draw(self, surface):
+        import drawing
+        
         # Shadow
-        pygame.draw.ellipse(surface, (20,20,20), (self.rect.x, c.FLOOR_Y - 10, c.P_WIDTH, 20))
+        pygame.draw.ellipse(surface, (20,20,20), (self.rect.centerx - 25, c.FLOOR_Y - 10, 50, 20))
         
-        # Body
-        color = c.WHITE if self.color_flash > 0 else self.color
-        pygame.draw.rect(surface, color, self.rect)
+        # Draw character based on professor type
+        char_name = self.stats.get('name', '')
         
-        # Eyes
-        eye_x = self.rect.right - 15 if self.facing_right else self.rect.left + 5
-        pygame.draw.rect(surface, c.BLACK, (eye_x, self.rect.y + 15, 10, 5))
+        if 'KHALID' in char_name:
+            drawing.draw_khalid(surface, self.rect.centerx, self.rect.bottom, 
+                              self.facing_right, self.animation_state, self.animation_frame)
+        elif 'EDUARDO' in char_name:
+            drawing.draw_eduardo(surface, self.rect.centerx, self.rect.bottom, 
+                               self.facing_right, self.animation_state, self.animation_frame)
+        elif 'HASAN' in char_name:
+            drawing.draw_hasan(surface, self.rect.centerx, self.rect.bottom, 
+                             self.facing_right, self.animation_state, self.animation_frame)
+        elif 'HAMMOUD' in char_name:
+            drawing.draw_hammoud(surface, self.rect.centerx, self.rect.bottom, 
+                                self.facing_right, self.animation_state, self.animation_frame)
+        else:
+            # Fallback to simple rectangle
+            color = c.WHITE if self.color_flash > 0 else self.color
+            pygame.draw.rect(surface, color, self.rect)
+            eye_x = self.rect.right - 15 if self.facing_right else self.rect.left + 5
+            pygame.draw.rect(surface, c.BLACK, (eye_x, self.rect.y + 15, 10, 5))
         
-        # Hitbox Debug View
+        # Hitbox Debug View (optional)
         if self.attacking and self.attack_rect:
             s = pygame.Surface((self.attack_rect.width, self.attack_rect.height))
             s.set_alpha(100)
