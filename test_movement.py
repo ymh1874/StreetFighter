@@ -70,10 +70,15 @@ def test_horizontal_movement():
     print("\nTest 3: Different character speeds")
     all_speeds_work = True
     
+    test_controls = {
+        'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w,
+        'light': pygame.K_j, 'heavy': pygame.K_k, 'kick': pygame.K_l, 'special': pygame.K_i
+    }
+    
     for char in c.CHARACTERS:
         pygame.quit()
         pygame.init()
-        f = Fighter(400, 400, char, controls, is_p2=False)
+        f = Fighter(400, 400, char, test_controls, is_p2=False)
         if f.speed != char['speed']:
             all_speeds_work = False
             print(f"  ✗ {char['name']} speed mismatch")

@@ -458,13 +458,15 @@ def test_edge_cases():
         }
         
         fighter = Fighter(400, 400, c.CHARACTERS[0], controls, is_p2=False)
-        fighter.health = 0
+        # Reduce health to 1 then apply fatal damage
+        fighter.health = 1
+        fighter.take_damage(10, 0, 0, True)
         
-        if fighter.health >= 0 and not fighter.alive:
+        if fighter.health == 0 and not fighter.alive:
             print(f"  ✓ Zero health handled correctly (health: {fighter.health}, alive: {fighter.alive})")
             tests_passed += 1
         else:
-            print(f"  ✗ Zero health edge case issue")
+            print(f"  ✗ Zero health edge case issue (health: {fighter.health}, alive: {fighter.alive})")
         
         pygame.quit()
     except Exception as e:
