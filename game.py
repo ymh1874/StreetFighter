@@ -17,10 +17,12 @@ Date: 2026
 import pygame
 import sys
 import random
+import os
 import config as c
 from entities import Fighter, Particle, SpinningKickEffect, HitEffect, Projectile
 from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
 from combat import CombatSystem
+import drawing
 
 
 class SoundManager:
@@ -33,7 +35,6 @@ class SoundManager:
         self.current_track = 0
         
         # Load available music tracks
-        import os
         for track in ['music.mp3', 'music2.mp3']:
             if os.path.exists(track):
                 self.music_tracks.append(track)
@@ -497,7 +498,6 @@ class Game:
             # Draw character portrait (head only, centered in box)
             portrait_x = x + box_width // 2
             portrait_y = y + box_height // 2
-            import drawing
             char_name = char['name']
             if 'KHALID' in char_name:
                 drawing.draw_khalid(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
@@ -513,10 +513,7 @@ class Game:
             name_x = x + box_width // 2 - name.get_width() // 2
             self.screen.blit(name, (name_x, y + box_height + 8))
             
-            # Description - centered, extra small
-            from ui_components import VintageTextRenderer
-            tiny_renderer = VintageTextRenderer()
-            # Use smaller size by scaling down
+            # Description - centered, extra small (use smaller font)
             desc_font = pygame.font.Font(None, 16)
             desc = desc_font.render(char['desc'], True, c.GRAY)
             desc_x = x + box_width // 2 - desc.get_width() // 2
@@ -801,7 +798,6 @@ class Game:
                 loser = self.p2
             
             # Draw blood puddle at loser's position
-            import drawing
             drawing.draw_blood_puddle(game_surface, loser.rect.centerx, c.FLOOR_Y, 80)
             
             # Draw defeated character on top of blood puddle

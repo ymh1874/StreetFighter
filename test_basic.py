@@ -25,8 +25,8 @@ def test_fighter_creation():
                      combat_system=combat_system, fighter_id="p1")
     
     assert fighter.health == fighter.max_health
-    assert fighter.alive == True
-    assert fighter.dashing == False
+    assert fighter.alive
+    assert not fighter.dashing
     assert fighter.dash_timer == 0
     print("✓ Fighter creation test passed")
 
@@ -46,7 +46,7 @@ def test_dash_mechanics():
     fighter.dashing = True
     fighter.dash_timer = c.FRAME_DATA['dash']['active']
     
-    assert fighter.dashing == True
+    assert fighter.dashing
     assert fighter.dash_timer == 8
     print("✓ Dash mechanics test passed")
 
@@ -124,7 +124,7 @@ def test_all_characters():
         combat_system.register_fighter(f"test_{i}")
         fighter = Fighter(200, 200, char, controls, is_p2=False,
                          combat_system=combat_system, fighter_id=f"test_{i}")
-        assert fighter.alive == True
+        assert fighter.alive
         assert 'name' in fighter.stats
         print(f"  ✓ {char['name']} created successfully")
     
