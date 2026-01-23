@@ -18,7 +18,7 @@ import pygame
 import sys
 import random
 import config as c
-from entities import Fighter, Particle
+from entities import Fighter, Particle, SpinningKickEffect, HitEffect, Projectile
 from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
 from combat import CombatSystem
 
@@ -570,12 +570,10 @@ class Game:
         if self.p1.health <= 0 or self.p2.health <= 0 or self.round_timer <= 0:
             # Add KO effect
             if self.p1.health <= 0:
-                from entities import HitEffect
                 self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
                 self.ko_slowdown = True
                 self.slowdown_timer = 30
             elif self.p2.health <= 0:
-                from entities import HitEffect
                 self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
                 self.ko_slowdown = True
                 self.slowdown_timer = 30
@@ -625,7 +623,6 @@ class Game:
         self.p2.update()
         
         # Update and handle projectiles
-        from entities import Projectile, HitEffect
         for proj in self.projectiles[:]:
             proj.update()
             if not proj.active:
@@ -662,7 +659,6 @@ class Game:
                 proj.active = False
         
         # Update special effects
-        from entities import SpinningKickEffect
         for effect in self.special_effects[:]:
             effect.update()
             if not effect.active:
@@ -756,7 +752,6 @@ class Game:
             proj.draw(game_surface)
         
         # Draw special effects (spinning kick rotation)
-        from entities import SpinningKickEffect
         for effect in self.special_effects:
             if isinstance(effect, SpinningKickEffect):
                 # Draw rotation effect
