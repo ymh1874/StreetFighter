@@ -83,7 +83,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (spinning kick)
         khalid.attacking = False
         khalid.last_attack_time = 0
-        khalid.last_special_time = 0
+        khalid.last_special_time = -2000  # Allow immediate use
         result = khalid.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, SpinningKickEffect)
@@ -106,7 +106,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (pizza throw)
         eduardo.attacking = False
         eduardo.last_attack_time = 0
-        eduardo.last_special_time = 0
+        eduardo.last_special_time = -2000  # Allow immediate use
         result = eduardo.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, list)
@@ -132,7 +132,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (fireball)
         hasan.attacking = False
         hasan.last_attack_time = 0
-        hasan.last_special_time = 0
+        hasan.last_special_time = -2000  # Allow immediate use
         result = hasan.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, SineWaveFireball)
@@ -155,7 +155,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (circuit board)
         hammoud.attacking = False
         hammoud.last_attack_time = 0
-        hammoud.last_special_time = 0
+        hammoud.last_special_time = -2000  # Allow immediate use
         result = hammoud.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, HomingCircuitBoard)

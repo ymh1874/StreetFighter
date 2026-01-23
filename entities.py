@@ -278,12 +278,14 @@ class Attack:
         self.stun = stun 
 
 class Fighter:
-    def __init__(self, x, y, stats, controls, is_p2=False):
+    def __init__(self, x, y, stats, controls, is_p2=False, combat_system=None, fighter_id=None):
         self.rect = pygame.Rect(x, y, c.P_WIDTH, c.P_HEIGHT)
         self.stats = stats
         self.color = stats['color']
         self.controls = controls 
         self.is_p2 = is_p2
+        self.combat_system = combat_system  # Reference to combat system for combo tracking
+        self.fighter_id = fighter_id  # "p1" or "p2" for combo tracking
         
         # Physics from stats
         self.speed = stats['speed']
@@ -310,7 +312,7 @@ class Fighter:
         self.animation_state = 'idle'
         self.animation_frame = 0
         self.special_move_cooldown = 0
-        self.last_special_time = 0
+        self.last_special_time = -2000  # Initialize to -2000 to allow immediate special move use
         
         # Attack history for combos
         self.attack_history = []
@@ -441,7 +443,14 @@ class Fighter:
         self.attack_rect = pygame.Rect(hitbox_x, hitbox_y, move_data.width, move_data.height)
         
         if self.attack_rect.colliderect(target.rect):
-            target.take_damage(move_data.damage, move_data.knockback, move_data.stun, self.facing_right)
+            # Apply combo damage scaling if combat system is available
+            damage = move_data.damage
+            if self.combat_system and self.fighter_id:
+                combo_multiplier = self.combat_system.get_combo_damage_multiplier(self.fighter_id)
+                damage *= combo_multiplier
+                self.combat_system.increment_combo(self.fighter_id)
+            
+            target.take_damage(damage, move_data.knockback, move_data.stun, self.facing_right)
             return True 
         return False
     
@@ -487,6 +496,10 @@ class Fighter:
         self.hit_stun = stun
         self.attacking = False 
         self.color_flash = 5 
+        
+        # Reset this fighter's combo when taking damage
+        if self.combat_system and self.fighter_id:
+            self.combat_system.reset_combo(self.fighter_id)
         
         direction = 1 if attacker_facing_right else -1
         self.rect.x += knockback * direction * 2 

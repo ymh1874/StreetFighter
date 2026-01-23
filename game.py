@@ -20,6 +20,7 @@ import random
 import config as c
 from entities import Fighter, Particle
 from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
+from combat import CombatSystem
 
 
 class SoundManager:
@@ -137,6 +138,7 @@ class Game:
         self.particles = []
         self.projectiles = []
         self.special_effects = []
+        self.combat_system = CombatSystem()  # Combat system for tracking combos
     
     # ==================== GAME LOOP ====================
     
@@ -542,8 +544,12 @@ class Game:
         stats_p1 = c.CHARACTERS[self.p1_cursor]
         stats_p2 = c.CHARACTERS[self.p2_cursor]
         
-        self.p1 = Fighter(200, 200, stats_p1, controls_p1, is_p2=False)
-        self.p2 = Fighter(550, 200, stats_p2, controls_p2, is_p2=True)
+        self.p1 = Fighter(200, 200, stats_p1, controls_p1, is_p2=False, combat_system=self.combat_system, fighter_id="p1")
+        self.p2 = Fighter(550, 200, stats_p2, controls_p2, is_p2=True, combat_system=self.combat_system, fighter_id="p2")
+        
+        # Register fighters with combat system for combo tracking
+        self.combat_system.register_fighter("p1")
+        self.combat_system.register_fighter("p2")
         
         # Reset fight variables
         self.round_timer = 99
@@ -629,13 +635,27 @@ class Game:
             # Check collision with fighters
             proj_rect = proj.get_rect()
             if proj.owner == self.p1 and proj_rect.colliderect(self.p2.rect):
-                self.p2.take_damage(proj.damage, 10, 15, self.p1.facing_right)
+                # Apply combo damage scaling
+                damage = proj.damage
+                if self.p1.combat_system and self.p1.fighter_id:
+                    combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
+                    damage *= combo_multiplier
+                    self.p1.combat_system.increment_combo(self.p1.fighter_id)
+                
+                self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
                 self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
                 self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
                 self.screen_shake = 8
                 proj.active = False
             elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
-                self.p1.take_damage(proj.damage, 10, 15, self.p2.facing_right)
+                # Apply combo damage scaling
+                damage = proj.damage
+                if self.p2.combat_system and self.p2.fighter_id:
+                    combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
+                    damage *= combo_multiplier
+                    self.p2.combat_system.increment_combo(self.p2.fighter_id)
+                
+                self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
                 self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
                 self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
                 self.screen_shake = 8
@@ -652,10 +672,18 @@ class Game:
             # Check for spinning kick hits
             if isinstance(effect, SpinningKickEffect) and effect.can_hit():
                 target = self.p2 if effect.fighter == self.p1 else self.p1
-                kick_rect = pygame.Rect(effect.fighter.rect.x - 30, effect.fighter.rect.y - 30, 
-                                       effect.fighter.rect.width + 60, effect.fighter.rect.height + 60)
+                attacker = effect.fighter
+                kick_rect = pygame.Rect(attacker.rect.x - 30, attacker.rect.y - 30, 
+                                       attacker.rect.width + 60, attacker.rect.height + 60)
                 if kick_rect.colliderect(target.rect):
-                    target.take_damage(8, 15, 10, effect.fighter.facing_right)
+                    # Apply combo damage scaling
+                    damage = 8
+                    if attacker.combat_system and attacker.fighter_id:
+                        combo_multiplier = attacker.combat_system.get_combo_damage_multiplier(attacker.fighter_id)
+                        damage *= combo_multiplier
+                        attacker.combat_system.increment_combo(attacker.fighter_id)
+                    
+                    target.take_damage(damage, 15, 10, attacker.facing_right)
                     effect.register_hit()
                     self._spawn_particles(target.rect.centerx, target.rect.centery, c.ORANGE)
                     self.hit_effects.append(HitEffect(target.rect.centerx, target.rect.centery, 'heavy', c.ORANGE))
