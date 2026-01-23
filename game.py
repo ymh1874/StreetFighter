@@ -372,7 +372,6 @@ class Game:
         self.screen.blit(p1_title, (130, y_offset))
         
         # Use smaller font for control text
-        small_font = pygame.font.Font(None, 20)
         controls_p1 = [
             "MOVE: W/A/S/D",
             "LIGHT PUNCH: J",
@@ -384,7 +383,7 @@ class Game:
         ]
         
         for i, control in enumerate(controls_p1):
-            text = small_font.render(control, True, c.WHITE)
+            text = self.text_renderer.render(control, 'small', c.WHITE)
             self.screen.blit(text, (150, y_offset + 35 + i * 22))
         
         # Player 2 controls
@@ -402,7 +401,7 @@ class Game:
         ]
         
         for i, control in enumerate(controls_p2):
-            text = small_font.render(control, True, c.WHITE)
+            text = self.text_renderer.render(control, 'small', c.WHITE)
             self.screen.blit(text, (470, y_offset + 35 + i * 22))
         
         # Back button
@@ -514,14 +513,13 @@ class Game:
             self.screen.blit(name, (name_x, y + box_height + 8))
             
             # Description - centered, extra small (use smaller font)
-            desc_font = pygame.font.Font(None, 16)
-            desc = desc_font.render(char['desc'], True, c.GRAY)
+            desc = self.text_renderer.render(char['desc'], 'small', c.GRAY)
             desc_x = x + box_width // 2 - desc.get_width() // 2
             self.screen.blit(desc, (desc_x, y + box_height + 28))
             
             # Stats - centered, extra small
             stats = f"HP:{char['health']} SPD:{char['speed']}"
-            stats_surf = desc_font.render(stats, True, c.GRAY)
+            stats_surf = self.text_renderer.render(stats, 'small', c.GRAY)
             stats_x = x + box_width // 2 - stats_surf.get_width() // 2
             self.screen.blit(stats_surf, (stats_x, y + box_height + 42))
             
@@ -535,8 +533,7 @@ class Game:
                 self.screen.blit(p1_label, (label_x, y - 30))
                 
                 if self.p1_selected:
-                    ready_font = pygame.font.Font(None, 18)
-                    ready = ready_font.render("READY!", True, c.YELLOW)
+                    ready = self.text_renderer.render("READY!", 'small', c.YELLOW)
                     ready_x = x + box_width // 2 - ready.get_width() // 2
                     self.screen.blit(ready, (ready_x, y + box_height + 60))
             
@@ -552,8 +549,7 @@ class Game:
                 self.screen.blit(p2_label, (label_x, y_pos))
                 
                 if self.p2_selected:
-                    ready_font = pygame.font.Font(None, 18)
-                    ready = ready_font.render("READY!", True, c.YELLOW)
+                    ready = self.text_renderer.render("READY!", 'small', c.YELLOW)
                     ready_x = x + box_width // 2 - ready.get_width() // 2
                     self.screen.blit(ready, (ready_x, y_pos + 18))
     
