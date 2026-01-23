@@ -40,11 +40,9 @@ class SoundManager:
             if pygame.mixer.get_init() is None:
                 pygame.mixer.init()
             self.mixer_available = True
-        except (ImportError, AttributeError, pygame.error) as e:
+        except (ImportError, AttributeError, pygame.error, OSError) as e:
             print(f"Mixer module not available: {e}")
-            return
-        except Exception as e:
-            print(f"Unexpected error initializing mixer: {e}")
+            print("Game will continue without audio")
             return
         
         # Load available music tracks (only if mixer is available)
