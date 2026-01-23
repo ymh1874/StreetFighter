@@ -45,10 +45,7 @@ class SoundManager:
             print("Game will continue without audio")
             return
         
-        # Load available music tracks (only if mixer is available)
-        if not self.mixer_available:
-            return
-            
+        # Load available music tracks
         for track in ['music.mp3', 'music2.mp3']:
             if os.path.exists(track):
                 self.music_tracks.append(track)
