@@ -113,7 +113,6 @@ class Game:
         self.slowdown_timer = 0
         
         # Set random seed for consistent ground texture
-        import random
         random.seed(42)
         
         # Game state management
