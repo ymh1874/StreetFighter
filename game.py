@@ -25,62 +25,6 @@ from combat import CombatSystem
 import drawing
 
 
-class SoundManager:
-    """Manages all game audio - music and sound effects"""
-    
-    def __init__(self):
-        """Initialize sound system and load audio files"""
-        self.sounds = {}
-        self.music_tracks = []
-        self.current_track = 0
-        self.mixer_available = False
-        
-        # Check if pygame.mixer is available
-        try:
-            if pygame.mixer.get_init() is None:
-                pygame.mixer.init()
-            self.mixer_available = True
-        except (ImportError, AttributeError, pygame.error, OSError) as e:
-            print(f"Mixer module not available: {e}")
-            print("Game will continue without audio")
-            return
-        
-        # Load available music tracks
-        for track in ['music.mp3', 'music2.mp3']:
-            if os.path.exists(track):
-                self.music_tracks.append(track)
-        
-        # Start playing first track if available
-        if self.music_tracks:
-            try:
-                pygame.mixer.music.load(self.music_tracks[0])
-                pygame.mixer.music.set_volume(0.5)
-                pygame.mixer.music.play(-1)  # Loop forever
-                print(f"Playing: {self.music_tracks[0]}")
-            except Exception as e:
-                print(f"Error loading music: {e}")
-        else:
-            print("No music files found - running without background music")
-
-    def play(self, name):
-        """Play a sound effect by name"""
-        if self.mixer_available and name in self.sounds:
-            self.sounds[name].play()
-    
-    def next_track(self):
-        """Switch to next music track"""
-        if not self.mixer_available:
-            return
-        if len(self.music_tracks) > 1:
-            self.current_track = (self.current_track + 1) % len(self.music_tracks)
-            try:
-                pygame.mixer.music.load(self.music_tracks[self.current_track])
-                pygame.mixer.music.play(-1)
-                print(f"Now playing: {self.music_tracks[self.current_track]}")
-            except Exception as e:
-                print(f"Error switching track: {e}")
-
-
 class Game:
     """
     Main game class - handles all game logic, rendering, and state management
@@ -102,7 +46,6 @@ class Game:
         # Core game components
         self.clock = pygame.time.Clock()
         self.text_renderer = VintageTextRenderer()
-        self.sound_manager = SoundManager()
         
         # Visual effects
         self.scanlines = ScanlineEffect(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
