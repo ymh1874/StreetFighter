@@ -10,5 +10,5 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Ignore cache files
-ycache/
+# Ignore test files
+test_basic.py

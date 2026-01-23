@@ -314,6 +314,12 @@ class Fighter:
         self.special_move_cooldown = 0
         self.last_special_time = -2000  # Initialize to -2000 to allow immediate special move use
         
+        # Dash State
+        self.dashing = False
+        self.dash_timer = 0
+        self.dash_cooldown = 0
+        self.last_dash_time = 0
+        
         # Attack history for combos
         self.attack_history = []
 
@@ -356,9 +362,28 @@ class Fighter:
             return
 
         key = pygame.key.get_pressed()
+        
+        # Dash handling
+        current_time = pygame.time.get_ticks()
+        if key[self.controls.get('dash', pygame.K_LSHIFT)] and not self.dashing and not self.jumping and current_time - self.last_dash_time > 500:
+            self.dashing = True
+            self.dash_timer = c.FRAME_DATA['dash']['active']  # 8 frames
+            self.last_dash_time = current_time
+            self.animation_state = 'dash'
+        
+        # Update dash
+        if self.dashing:
+            self.dash_timer -= 1
+            if self.dash_timer <= 0:
+                self.dashing = False
+                self.animation_state = 'idle'
+            else:
+                # Fast movement during dash
+                dash_speed = self.speed * 2.5
+                dx = dash_speed if self.facing_right else -dash_speed
 
-        # Input Handling - can move during light attacks
-        if self.can_move():
+        # Input Handling - can move during light attacks (but not during dash)
+        if self.can_move() and not self.dashing:
             if key[self.controls['left']]:
                 dx = -self.speed
                 self.facing_right = False
@@ -438,7 +463,8 @@ class Fighter:
         
         # Regular attacks
         hitbox_x = self.rect.right if self.facing_right else self.rect.left - move_data.width
-        hitbox_y = self.rect.y + 10
+        # Center hitbox vertically on character (was +10, now centered)
+        hitbox_y = self.rect.y + (self.rect.height - move_data.height) // 2
         
         self.attack_rect = pygame.Rect(hitbox_x, hitbox_y, move_data.width, move_data.height)
         
@@ -529,6 +555,11 @@ class Fighter:
     def draw(self, surface):
         # Shadow
         pygame.draw.ellipse(surface, (20,20,20), (self.rect.centerx - 25, c.FLOOR_Y - 10, 50, 20))
+        
+        # Draw dash particles if dashing
+        if self.dashing:
+            drawing.draw_dash_particles(surface, self.rect.centerx, self.rect.centery, 
+                                       self.facing_right, self.animation_frame)
         
         # Draw character based on professor type
         char_name = self.stats.get('name', '')
