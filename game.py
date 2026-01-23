@@ -389,14 +389,9 @@ class Game:
             "CMUQ ARENA",
             "ULTIMATE FIGHTING CHAMPIONSHIP",
             "",
-            "A vintage arcade-style fighting game",
-            "featuring intense 1v1 combat with",
-            "unique characters and special moves.",
-            "",
-            "Developed with passion for",
-            "classic arcade gaming.",
-            "",
-            "Version 1.0 - 2026"
+            "Made by Game Dev Club with Love",
+            "Yousef Hussein - Class of 2029",
+            "Version 1.0 - Tarnival 2026"
         ]
         
         for i, line in enumerate(info_lines):
