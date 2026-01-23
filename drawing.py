@@ -434,3 +434,91 @@ def draw_victory_pose_hammoud(surface, x, y, frame):
         text_x = x - 30 + i * 15
         text_y = (y - 50 + (frame * 2 + i * 10) % 100)
         # Binary digits would be rendered by game
+
+
+def draw_blood_puddle(surface, x, y, size=60):
+    """Draw a blood puddle on the ground"""
+    # Main puddle (dark red)
+    blood_color = (139, 0, 0)  # Dark red
+    # Draw irregular puddle with overlapping circles
+    pygame.draw.ellipse(surface, blood_color, (x - size // 2, y - size // 4, size, size // 2))
+    pygame.draw.ellipse(surface, blood_color, (x - size // 3, y - size // 5, size * 2 // 3, size // 3))
+    pygame.draw.ellipse(surface, blood_color, (x - size // 4, y - size // 6, size // 2, size // 4))
+    
+    # Darker spots for depth
+    darker_blood = (100, 0, 0)
+    pygame.draw.ellipse(surface, darker_blood, (x - size // 4, y - size // 8, size // 3, size // 6))
+
+
+def draw_defeated_character(surface, x, y, char_name, skin_color, outfit_color):
+    """Draw a character laying on the ground (defeated)"""
+    # Character laying down on their back
+    # Body (horizontal)
+    body_rect = pygame.Rect(x - 40, y - 15, 60, 25)
+    pygame.draw.rect(surface, outfit_color, body_rect)
+    
+    # Head (tilted to side)
+    head_x = int(x + 35)
+    head_y = int(y - 10)
+    pygame.draw.circle(surface, skin_color, (head_x, head_y), 10)
+    
+    # Closed eyes (X marks)
+    pygame.draw.line(surface, c.BLACK, (head_x - 3, head_y - 2), (head_x - 1, head_y), 2)
+    pygame.draw.line(surface, c.BLACK, (head_x - 1, head_y - 2), (head_x - 3, head_y), 2)
+    pygame.draw.line(surface, c.BLACK, (head_x + 1, head_y - 2), (head_x + 3, head_y), 2)
+    pygame.draw.line(surface, c.BLACK, (head_x + 3, head_y - 2), (head_x + 1, head_y), 2)
+    
+    # Arms (spread out)
+    pygame.draw.line(surface, skin_color, (x - 10, y - 10), (x - 30, y - 25), 5)
+    pygame.draw.line(surface, skin_color, (x + 10, y - 10), (x + 20, y - 25), 5)
+    
+    # Legs (spread out)
+    pygame.draw.line(surface, outfit_color, (x - 20, y + 10), (x - 35, y + 25), 6)
+    pygame.draw.line(surface, outfit_color, (x - 5, y + 10), (x + 5, y + 30), 6)
+
+
+def draw_victory_dance(surface, x, y, char_name, skin_color, outfit_color, frame):
+    """Draw character doing a victory dance (bouncing up and down)"""
+    # Calculate bounce offset (up and down motion)
+    bounce_offset = int(math.sin(frame * 0.3) * 15)
+    
+    # Draw character at bounced position
+    dance_y = y + bounce_offset
+    
+    # Use appropriate character draw function
+    if 'KHALID' in char_name:
+        draw_khalid(surface, x, dance_y, True, 'idle', frame)
+    elif 'EDUARDO' in char_name:
+        draw_eduardo(surface, x, dance_y, True, 'idle', frame)
+    elif 'HASAN' in char_name:
+        draw_hasan(surface, x, dance_y, True, 'idle', frame)
+    elif 'HAMMOUD' in char_name:
+        draw_hammoud(surface, x, dance_y, True, 'idle', frame)
+    
+    # Add victory sparkles around character
+    for i in range(3):
+        sparkle_angle = (frame * 10 + i * 120) % 360
+        sparkle_rad = math.radians(sparkle_angle)
+        sparkle_x = x + 30 * math.cos(sparkle_rad)
+        sparkle_y = dance_y - 40 + 30 * math.sin(sparkle_rad)
+        pygame.draw.circle(surface, c.YELLOW, (int(sparkle_x), int(sparkle_y)), 3)
+
+
+def draw_dash_particles(surface, x, y, facing_right, frame):
+    """Draw air particles for dash effect"""
+    # Direction opposite to dash
+    direction = -1 if facing_right else 1
+    
+    # Spawn particles trailing behind
+    for i in range(5):
+        particle_x = x + (direction * (10 + i * 8))
+        particle_y = y - 20 + (i % 3) * 10
+        
+        # Fade based on distance
+        alpha = 255 - (i * 40)
+        if alpha > 0:
+            size = 6 - i
+            if size > 0:
+                # Create particle with fade effect
+                particle_color = (200, 200, 255)
+                pygame.draw.circle(surface, particle_color, (int(particle_x), int(particle_y)), size)

@@ -29,17 +29,42 @@ class SoundManager:
     def __init__(self):
         """Initialize sound system and load audio files"""
         self.sounds = {}
-        try:
-            pygame.mixer.music.load('music.mp3')
-            pygame.mixer.music.set_volume(0.5)
-            pygame.mixer.music.play(-1)  # Loop forever
-        except:
-            print("No music file found - running without background music")
+        self.music_tracks = []
+        self.current_track = 0
+        
+        # Load available music tracks
+        import os
+        for track in ['music.mp3', 'music2.mp3']:
+            if os.path.exists(track):
+                self.music_tracks.append(track)
+        
+        # Start playing first track if available
+        if self.music_tracks:
+            try:
+                pygame.mixer.music.load(self.music_tracks[0])
+                pygame.mixer.music.set_volume(0.5)
+                pygame.mixer.music.play(-1)  # Loop forever
+                print(f"Playing: {self.music_tracks[0]}")
+            except Exception as e:
+                print(f"Error loading music: {e}")
+        else:
+            print("No music files found - running without background music")
 
     def play(self, name):
         """Play a sound effect by name"""
         if name in self.sounds:
             self.sounds[name].play()
+    
+    def next_track(self):
+        """Switch to next music track"""
+        if len(self.music_tracks) > 1:
+            self.current_track = (self.current_track + 1) % len(self.music_tracks)
+            try:
+                pygame.mixer.music.load(self.music_tracks[self.current_track])
+                pygame.mixer.music.play(-1)
+                print(f"Now playing: {self.music_tracks[self.current_track]}")
+            except Exception as e:
+                print(f"Error switching track: {e}")
 
 
 class Game:
@@ -139,6 +164,8 @@ class Game:
         self.projectiles = []
         self.special_effects = []
         self.combat_system = CombatSystem()  # Combat system for tracking combos
+        self.winner_sequence_active = False
+        self.winner_sequence_frame = 0
     
     # ==================== GAME LOOP ====================
     
@@ -333,16 +360,18 @@ class Game:
         title_x = c.SCREEN_WIDTH // 2 - title.get_width() // 2
         self.screen.blit(title, (title_x, 50))
         
-        # Controls panel
-        panel_rect = pygame.Rect(100, 150, c.SCREEN_WIDTH - 200, 320)
+        # Controls panel - made taller to fit all text
+        panel_rect = pygame.Rect(100, 150, c.SCREEN_WIDTH - 200, 380)
         pygame.draw.rect(self.screen, c.BLACK, panel_rect)
         pygame.draw.rect(self.screen, c.ORANGE, panel_rect, 3)
         
         # Player 1 controls
-        y_offset = 180
+        y_offset = 170
         p1_title = self.text_renderer.render("PLAYER 1", 'medium', c.RED)
-        self.screen.blit(p1_title, (150, y_offset))
+        self.screen.blit(p1_title, (130, y_offset))
         
+        # Use smaller font for control text
+        small_font = pygame.font.Font(None, 20)
         controls_p1 = [
             "MOVE: W/A/S/D",
             "LIGHT PUNCH: J",
@@ -354,8 +383,8 @@ class Game:
         ]
         
         for i, control in enumerate(controls_p1):
-            text = self.text_renderer.render(control, 'small', c.WHITE)
-            self.screen.blit(text, (170, y_offset + 40 + i * 25))
+            text = small_font.render(control, True, c.WHITE)
+            self.screen.blit(text, (150, y_offset + 35 + i * 22))
         
         # Player 2 controls
         p2_title = self.text_renderer.render("PLAYER 2", 'medium', c.BLUE)
@@ -363,17 +392,17 @@ class Game:
         
         controls_p2 = [
             "MOVE: ARROW KEYS",
-            "LIGHT PUNCH: NUMPAD 1",
-            "HEAVY PUNCH: NUMPAD 2",
-            "LIGHT KICK: NUMPAD 3",
-            "HEAVY KICK: NUMPAD 4",
-            "SPECIAL: NUMPAD 0",
+            "LIGHT PUNCH: NUM 1",
+            "HEAVY PUNCH: NUM 2",
+            "LIGHT KICK: NUM 3",
+            "HEAVY KICK: NUM 4",
+            "SPECIAL: NUM 0",
             "DASH: RIGHT SHIFT"
         ]
         
         for i, control in enumerate(controls_p2):
-            text = self.text_renderer.render(control, 'small', c.WHITE)
-            self.screen.blit(text, (470, y_offset + 40 + i * 25))
+            text = small_font.render(control, True, c.WHITE)
+            self.screen.blit(text, (470, y_offset + 35 + i * 22))
         
         # Back button
         self.controls_back_button.draw(self.screen, self.text_renderer)
@@ -465,35 +494,54 @@ class Game:
             pygame.draw.rect(self.screen, char['color'], char_rect)
             pygame.draw.rect(self.screen, c.WHITE, char_rect, 3)
             
-            # Character name - centered
-            name = self.text_renderer.render(char['name'], 'medium', c.WHITE)
+            # Draw character portrait (head only, centered in box)
+            portrait_x = x + box_width // 2
+            portrait_y = y + box_height // 2
+            import drawing
+            char_name = char['name']
+            if 'KHALID' in char_name:
+                drawing.draw_khalid(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
+            elif 'EDUARDO' in char_name:
+                drawing.draw_eduardo(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
+            elif 'HASAN' in char_name:
+                drawing.draw_hasan(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
+            elif 'HAMMOUD' in char_name:
+                drawing.draw_hammoud(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
+            
+            # Character name - centered, smaller font
+            name = self.text_renderer.render(char['name'], 'small', c.WHITE)
             name_x = x + box_width // 2 - name.get_width() // 2
-            self.screen.blit(name, (name_x, y + box_height + 10))
+            self.screen.blit(name, (name_x, y + box_height + 8))
             
-            # Description - centered
-            desc = self.text_renderer.render(char['desc'], 'small', c.GRAY)
+            # Description - centered, extra small
+            from ui_components import VintageTextRenderer
+            tiny_renderer = VintageTextRenderer()
+            # Use smaller size by scaling down
+            desc_font = pygame.font.Font(None, 16)
+            desc = desc_font.render(char['desc'], True, c.GRAY)
             desc_x = x + box_width // 2 - desc.get_width() // 2
-            self.screen.blit(desc, (desc_x, y + box_height + 35))
+            self.screen.blit(desc, (desc_x, y + box_height + 28))
             
-            # Stats - centered
+            # Stats - centered, extra small
             stats = f"HP:{char['health']} SPD:{char['speed']}"
-            stats_surf = self.text_renderer.render(stats, 'small', c.GRAY)
+            stats_surf = desc_font.render(stats, True, c.GRAY)
             stats_x = x + box_width // 2 - stats_surf.get_width() // 2
-            self.screen.blit(stats_surf, (stats_x, y + box_height + 55))
+            self.screen.blit(stats_surf, (stats_x, y + box_height + 42))
             
             # P1 selection indicator
             if i == self.p1_cursor:
                 color = c.YELLOW if self.p1_selected else c.RED
                 pygame.draw.rect(self.screen, color, char_rect.inflate(10, 10), 5)
                 
-                p1_label = self.text_renderer.render("P1", 'medium', c.RED)
+                p1_label = self.text_renderer.render("P1", 'small', c.RED)
                 label_x = x + box_width // 2 - p1_label.get_width() // 2
-                self.screen.blit(p1_label, (label_x, y - 35))
+                self.screen.blit(p1_label, (label_x, y - 30))
                 
                 if self.p1_selected:
-                    ready = self.text_renderer.render("READY!", 'small', c.YELLOW)
+                    ready_font = pygame.font.Font(None, 18)
+                    ready = ready_font.render("READY!", True, c.YELLOW)
                     ready_x = x + box_width // 2 - ready.get_width() // 2
-                    self.screen.blit(ready, (ready_x, y + box_height + 75))
+                    self.screen.blit(ready, (ready_x, y + box_height + 60))
             
             # P2 selection indicator
             if i == self.p2_cursor:
@@ -501,44 +549,24 @@ class Game:
                 offset = 6 if i == self.p1_cursor else 0
                 pygame.draw.rect(self.screen, color, char_rect.inflate(10 + offset * 2, 10 + offset * 2), 5)
                 
-                p2_label = self.text_renderer.render("P2", 'medium', c.BLUE)
+                p2_label = self.text_renderer.render("P2", 'small', c.BLUE)
                 label_x = x + box_width // 2 - p2_label.get_width() // 2
-                y_pos = y + box_height + 95 if i == self.p1_cursor else y + box_height + 75
+                y_pos = y + box_height + 78 if i == self.p1_cursor else y + box_height + 60
                 self.screen.blit(p2_label, (label_x, y_pos))
                 
                 if self.p2_selected:
-                    ready = self.text_renderer.render("READY!", 'small', c.YELLOW)
+                    ready_font = pygame.font.Font(None, 18)
+                    ready = ready_font.render("READY!", True, c.YELLOW)
                     ready_x = x + box_width // 2 - ready.get_width() // 2
-                    self.screen.blit(ready, (ready_x, y_pos + 20))
+                    self.screen.blit(ready, (ready_x, y_pos + 18))
     
     # ==================== FIGHT STATE ====================
     
     def _start_fight(self):
         """Initialize a new fight with selected characters"""
-        # P1 controls
-        controls_p1 = {
-            'left': pygame.K_a, 
-            'right': pygame.K_d, 
-            'jump': pygame.K_w,
-            'light_punch': pygame.K_j, 
-            'heavy_punch': pygame.K_k, 
-            'light_kick': pygame.K_l, 
-            'heavy_kick': pygame.K_i,
-            'special': pygame.K_u,
-            'dash': pygame.K_LSHIFT
-        }
-        # P2 controls
-        controls_p2 = {
-            'left': pygame.K_LEFT, 
-            'right': pygame.K_RIGHT, 
-            'jump': pygame.K_UP,
-            'light_punch': pygame.K_KP1, 
-            'heavy_punch': pygame.K_KP2, 
-            'light_kick': pygame.K_KP3, 
-            'heavy_kick': pygame.K_KP4,
-            'special': pygame.K_KP0,
-            'dash': pygame.K_RSHIFT
-        }
+        # Use control configuration from config
+        controls_p1 = c.DEFAULT_P1_CONTROLS
+        controls_p2 = c.DEFAULT_P2_CONTROLS
         
         # Create fighters
         stats_p1 = c.CHARACTERS[self.p1_cursor]
@@ -573,13 +601,24 @@ class Game:
                 self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
                 self.ko_slowdown = True
                 self.slowdown_timer = 30
+                self.winner_sequence_active = True
             elif self.p2.health <= 0:
                 self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
                 self.ko_slowdown = True
                 self.slowdown_timer = 30
+                self.winner_sequence_active = True
             
-            if self.slowdown_timer <= 0:
+            if self.slowdown_timer <= 0 and not self.winner_sequence_active:
                 self.state = "GAME_OVER"
+        
+        # Winner sequence animation
+        if self.winner_sequence_active:
+            self.winner_sequence_frame += 1
+            if self.winner_sequence_frame > 180:  # 3 seconds at 60fps
+                self.state = "GAME_OVER"
+                self.winner_sequence_active = False
+                self.winner_sequence_frame = 0
+            return  # Don't update fight during winner sequence
         
         # Slow motion on KO
         if self.ko_slowdown:
@@ -688,15 +727,23 @@ class Game:
         # Spawn particles on hit
         if self.p1.attacking and self.p1.attack_rect and self.p1.attack_rect.colliderect(self.p2.rect):
             self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.RED)
-            # Add hit effect based on attack type
+            # Add hit effect based on attack type with randomness
             effect_type = 'heavy' if 'heavy' in self.p1.attack_type else 'light'
-            self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, effect_type, c.RED))
+            # Higher chance for heavy attacks (80%), lower for light (30%)
+            chance = 0.8 if effect_type == 'heavy' else 0.3
+            if random.random() < chance:
+                # Position text higher to avoid blood splash overlap (move up by 40 pixels)
+                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 40, effect_type, c.RED))
             if effect_type == 'heavy':
                 self.screen_shake = 10
         if self.p2.attacking and self.p2.attack_rect and self.p2.attack_rect.colliderect(self.p1.rect):
             self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.BLUE)
             effect_type = 'heavy' if 'heavy' in self.p2.attack_type else 'light'
-            self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, effect_type, c.BLUE))
+            # Higher chance for heavy attacks (80%), lower for light (30%)
+            chance = 0.8 if effect_type == 'heavy' else 0.3
+            if random.random() < chance:
+                # Position text higher to avoid blood splash overlap (move up by 40 pixels)
+                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 40, effect_type, c.BLUE))
             if effect_type == 'heavy':
                 self.screen_shake = 10
         
@@ -743,9 +790,31 @@ class Game:
             game_surface = self.screen
             shake_x, shake_y = 0, 0
         
-        # Draw fighters
-        self.p1.draw(game_surface)
-        self.p2.draw(game_surface)
+        # Draw fighters (or winner sequence)
+        if self.winner_sequence_active:
+            # Determine winner and loser
+            if self.p1.health <= 0:
+                winner = self.p2
+                loser = self.p1
+            else:
+                winner = self.p1
+                loser = self.p2
+            
+            # Draw blood puddle at loser's position
+            import drawing
+            drawing.draw_blood_puddle(game_surface, loser.rect.centerx, c.FLOOR_Y, 80)
+            
+            # Draw defeated character on top of blood puddle
+            drawing.draw_defeated_character(game_surface, loser.rect.centerx, c.FLOOR_Y,
+                                           loser.stats['name'], loser.stats['skin'], loser.stats['color'])
+            
+            # Draw winner doing victory dance
+            drawing.draw_victory_dance(game_surface, winner.rect.centerx, winner.rect.bottom,
+                                      winner.stats['name'], winner.stats['skin'], winner.stats['color'],
+                                      self.winner_sequence_frame)
+        else:
+            self.p1.draw(game_surface)
+            self.p2.draw(game_surface)
         
         # Draw projectiles
         for proj in self.projectiles:
@@ -841,6 +910,35 @@ class Game:
         
         p2_name = self.text_renderer.render(self.p2.stats['name'], 'medium', c.WHITE)
         self.screen.blit(p2_name, (p2_x, 55))
+        
+        # P1 Special ability power bar
+        power_bar_width = 150
+        power_bar_height = 15
+        current_time = pygame.time.get_ticks()
+        time_since_special_p1 = current_time - self.p1.last_special_time
+        special_cooldown = 2000  # 2 seconds
+        power_ratio_p1 = min(1.0, time_since_special_p1 / special_cooldown)
+        
+        pygame.draw.rect(self.screen, c.BLACK, (18, 78, power_bar_width + 4, power_bar_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (20, 80, power_bar_width, power_bar_height))
+        if power_ratio_p1 > 0:
+            filled_width = int(power_bar_width * power_ratio_p1)
+            color = c.YELLOW if power_ratio_p1 >= 1.0 else c.ORANGE
+            pygame.draw.rect(self.screen, color, (20, 80, filled_width, power_bar_height))
+        pygame.draw.rect(self.screen, c.WHITE, (20, 80, power_bar_width, power_bar_height), 2)
+        
+        # P2 Special ability power bar
+        time_since_special_p2 = current_time - self.p2.last_special_time
+        power_ratio_p2 = min(1.0, time_since_special_p2 / special_cooldown)
+        
+        p2_power_x = c.SCREEN_WIDTH - 20 - power_bar_width
+        pygame.draw.rect(self.screen, c.BLACK, (p2_power_x - 2, 78, power_bar_width + 4, power_bar_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (p2_power_x, 80, power_bar_width, power_bar_height))
+        if power_ratio_p2 > 0:
+            filled_width = int(power_bar_width * power_ratio_p2)
+            color = c.YELLOW if power_ratio_p2 >= 1.0 else c.ORANGE
+            pygame.draw.rect(self.screen, color, (p2_power_x, 80, filled_width, power_bar_height))
+        pygame.draw.rect(self.screen, c.WHITE, (p2_power_x, 80, power_bar_width, power_bar_height), 2)
         
         # Timer
         t_color = c.WHITE if self.round_timer > 10 else c.RED

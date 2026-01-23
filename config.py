@@ -111,3 +111,58 @@ COMBO_DAMAGE_SCALING = {
     4: 0.8,  # Fourth hit - 80% damage
     5: 0.8,  # Fifth hit - 80% damage
 }
+
+# Control Mapping System
+# This makes it easy to add arcade machine controls later
+# Just update the mapping dictionary without changing game logic
+
+# Action names (internal game actions)
+ACTIONS = [
+    'left', 'right', 'jump', 
+    'light_punch', 'heavy_punch', 
+    'light_kick', 'heavy_kick', 
+    'special', 'dash'
+]
+
+# Default keyboard controls for Player 1
+DEFAULT_P1_CONTROLS = {
+    'left': pygame.K_a,
+    'right': pygame.K_d,
+    'jump': pygame.K_w,
+    'light_punch': pygame.K_j,
+    'heavy_punch': pygame.K_k,
+    'light_kick': pygame.K_l,
+    'heavy_kick': pygame.K_i,
+    'special': pygame.K_u,
+    'dash': pygame.K_LSHIFT
+}
+
+# Default keyboard controls for Player 2
+DEFAULT_P2_CONTROLS = {
+    'left': pygame.K_LEFT,
+    'right': pygame.K_RIGHT,
+    'jump': pygame.K_UP,
+    'light_punch': pygame.K_KP1,
+    'heavy_punch': pygame.K_KP2,
+    'light_kick': pygame.K_KP3,
+    'heavy_kick': pygame.K_KP4,
+    'special': pygame.K_KP0,
+    'dash': pygame.K_RSHIFT
+}
+
+# Future arcade controls mapping (for reference)
+# To add arcade controls, map joystick/button inputs to pygame key constants
+# Example arcade mapping (not yet implemented):
+# ARCADE_P1_CONTROLS = {
+#     'left': JOYSTICK1_LEFT,
+#     'right': JOYSTICK1_RIGHT,
+#     'jump': JOYSTICK1_UP,
+#     'light_punch': BUTTON_X,
+#     'heavy_punch': BUTTON_Y,
+#     'light_kick': BUTTON_B,
+#     'heavy_kick': BUTTON_A,
+#     'special': BUTTON_SELECT,
+#     'dash': BUTTON_START
+# }
+# ARCADE_P2_CONTROLS = {...}
+# ARCADE_RESET = RESET_BUTTON
