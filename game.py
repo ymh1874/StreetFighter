@@ -42,7 +42,9 @@ class SoundManager:
             self.mixer_available = True
         except (ImportError, AttributeError, pygame.error) as e:
             print(f"Mixer module not available: {e}")
-            self.mixer_available = False
+            return
+        except Exception as e:
+            print(f"Unexpected error initializing mixer: {e}")
             return
         
         # Load available music tracks
