@@ -15,6 +15,10 @@ from entities import Fighter, Projectile, PizzaSlice, SineWaveFireball, HomingCi
 import config as c
 from combat import CombatSystem, FrameData
 
+# Test constants
+IMMEDIATE_SPECIAL_TIME = -2000  # Allow special moves to be used immediately
+ATTACK_COOLDOWN_WAIT_MS = 50   # Time to wait between attacks for cooldowns
+
 
 class TestAllCharacterActions(unittest.TestCase):
     """Test every single action for all 4 characters"""
@@ -83,7 +87,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (spinning kick)
         khalid.attacking = False
         khalid.last_attack_time = 0
-        khalid.last_special_time = -2000  # Allow immediate use
+        khalid.last_special_time = IMMEDIATE_SPECIAL_TIME
         result = khalid.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, SpinningKickEffect)
@@ -106,7 +110,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (pizza throw)
         eduardo.attacking = False
         eduardo.last_attack_time = 0
-        eduardo.last_special_time = -2000  # Allow immediate use
+        eduardo.last_special_time = IMMEDIATE_SPECIAL_TIME
         result = eduardo.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, list)
@@ -132,7 +136,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (fireball)
         hasan.attacking = False
         hasan.last_attack_time = 0
-        hasan.last_special_time = -2000  # Allow immediate use
+        hasan.last_special_time = IMMEDIATE_SPECIAL_TIME
         result = hasan.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, SineWaveFireball)
@@ -155,7 +159,7 @@ class TestAllCharacterActions(unittest.TestCase):
         # Test special (circuit board)
         hammoud.attacking = False
         hammoud.last_attack_time = 0
-        hammoud.last_special_time = -2000  # Allow immediate use
+        hammoud.last_special_time = IMMEDIATE_SPECIAL_TIME
         result = hammoud.attack(target, 'special')
         self.assertIsNotNone(result)
         self.assertIsInstance(result, HomingCircuitBoard)

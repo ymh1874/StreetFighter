@@ -5,12 +5,19 @@ Tests all characters, all combos, special moves, and edge cases
 import os
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pygame
 pygame.init()
 
 from entities import Fighter
 from combat import CombatSystem
 import config as c
+
+# Test constants
+IMMEDIATE_SPECIAL_TIME = -2000  # Allow special moves to be used immediately
+ATTACK_COOLDOWN_WAIT_MS = 50   # Time to wait between attacks for cooldowns
 
 def create_fighter(char_index, player_num, combat_system, fighter_id):
     controls = {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w,
@@ -41,10 +48,10 @@ for i, char_name in enumerate(char_names):
     for attack_type in attack_types:
         fighter.attacking = False
         fighter.last_attack_time = 0
-        fighter.last_special_time = -2000
+        fighter.last_special_time = IMMEDIATE_SPECIAL_TIME
         
         # Wait a bit for cooldowns
-        pygame.time.wait(50)
+        pygame.time.wait(ATTACK_COOLDOWN_WAIT_MS)
         
         result = fighter.attack(target, attack_type)
         
@@ -85,7 +92,7 @@ expected_damages = [
 
 test2_passed = True
 for i, (base_damage, expected_scaling) in enumerate(expected_damages, 1):
-    pygame.time.wait(50)
+    pygame.time.wait(ATTACK_COOLDOWN_WAIT_MS)
     attacker.attacking = False
     attacker.last_attack_time = 0
     target.rect.x = attacker.rect.right + 10
@@ -123,7 +130,7 @@ for i, char_name in enumerate(char_names):
     fighter = create_fighter(i, 1, combat_system3, "p1")
     target = create_fighter(0, 2, combat_system3, "p2")
     
-    # Try special move immediately (should work with last_special_time = -2000)
+    # Try special move immediately (should work with last_special_time = IMMEDIATE_SPECIAL_TIME)
     fighter.attacking = False
     fighter.last_attack_time = 0
     # Don't modify last_special_time - it should be -2000 by default
@@ -150,7 +157,7 @@ p2 = create_fighter(1, 2, combat_system4, "p2")
 # P1 builds a combo
 p2.rect.x = p1.rect.right + 10
 for _ in range(3):
-    pygame.time.wait(50)
+    pygame.time.wait(ATTACK_COOLDOWN_WAIT_MS)
     p1.attacking = False
     p1.last_attack_time = 0
     p2.rect.x = p1.rect.right + 10
