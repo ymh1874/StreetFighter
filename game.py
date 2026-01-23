@@ -47,7 +47,10 @@ class SoundManager:
             print(f"Unexpected error initializing mixer: {e}")
             return
         
-        # Load available music tracks
+        # Load available music tracks (only if mixer is available)
+        if not self.mixer_available:
+            return
+            
         for track in ['music.mp3', 'music2.mp3']:
             if os.path.exists(track):
                 self.music_tracks.append(track)
