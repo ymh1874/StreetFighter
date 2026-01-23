@@ -33,6 +33,17 @@ class SoundManager:
         self.sounds = {}
         self.music_tracks = []
         self.current_track = 0
+        self.mixer_available = False
+        
+        # Check if pygame.mixer is available
+        try:
+            if pygame.mixer.get_init() is None:
+                pygame.mixer.init()
+            self.mixer_available = True
+        except (ImportError, AttributeError, pygame.error) as e:
+            print(f"Mixer module not available: {e}")
+            self.mixer_available = False
+            return
         
         # Load available music tracks
         for track in ['music.mp3', 'music2.mp3']:
@@ -53,11 +64,13 @@ class SoundManager:
 
     def play(self, name):
         """Play a sound effect by name"""
-        if name in self.sounds:
+        if self.mixer_available and name in self.sounds:
             self.sounds[name].play()
     
     def next_track(self):
         """Switch to next music track"""
+        if not self.mixer_available:
+            return
         if len(self.music_tracks) > 1:
             self.current_track = (self.current_track + 1) % len(self.music_tracks)
             try:
@@ -491,7 +504,7 @@ class Game:
             char_rect = pygame.Rect(x, y, box_width, box_height)
             
             pygame.draw.rect(self.screen, c.BLACK, shadow_rect)
-            pygame.draw.rect(self.screen, char['color'], char_rect)
+            pygame.draw.rect(self.screen, c.GRAY, char_rect)
             pygame.draw.rect(self.screen, c.WHITE, char_rect, 3)
             
             # Draw character portrait (head only, centered in box)
@@ -625,7 +638,6 @@ class Game:
         # Update screen shake
         if self.screen_shake > 0:
             self.screen_shake -= 1
-            import random
             shake_amount = min(self.screen_shake, 5)
             self.screen_shake_offset = (
                 random.randint(-shake_amount, shake_amount),
@@ -762,7 +774,6 @@ class Game:
         pygame.draw.rect(self.screen, c.DIRT_BROWN, dirt_floor)
         
         # Add subtle texture with random darker spots (using consistent seed from __init__)
-        import random
         for _ in range(50):
             spot_x = random.randint(0, c.SCREEN_WIDTH)
             spot_y = random.randint(c.FLOOR_Y, c.SCREEN_HEIGHT)
