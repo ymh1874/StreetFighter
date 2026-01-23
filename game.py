@@ -638,9 +638,9 @@ class Game:
                 # Apply combo damage scaling
                 damage = proj.damage
                 if self.p1.combat_system and self.p1.fighter_id:
+                    self.p1.combat_system.increment_combo(self.p1.fighter_id)
                     combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
                     damage *= combo_multiplier
-                    self.p1.combat_system.increment_combo(self.p1.fighter_id)
                 
                 self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
                 self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
@@ -651,9 +651,9 @@ class Game:
                 # Apply combo damage scaling
                 damage = proj.damage
                 if self.p2.combat_system and self.p2.fighter_id:
+                    self.p2.combat_system.increment_combo(self.p2.fighter_id)
                     combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
                     damage *= combo_multiplier
-                    self.p2.combat_system.increment_combo(self.p2.fighter_id)
                 
                 self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
                 self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
@@ -679,9 +679,9 @@ class Game:
                     # Apply combo damage scaling
                     damage = 8
                     if attacker.combat_system and attacker.fighter_id:
+                        attacker.combat_system.increment_combo(attacker.fighter_id)
                         combo_multiplier = attacker.combat_system.get_combo_damage_multiplier(attacker.fighter_id)
                         damage *= combo_multiplier
-                        attacker.combat_system.increment_combo(attacker.fighter_id)
                     
                     target.take_damage(damage, 15, 10, attacker.facing_right)
                     effect.register_hit()

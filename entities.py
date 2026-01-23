@@ -446,9 +446,10 @@ class Fighter:
             # Apply combo damage scaling if combat system is available
             damage = move_data.damage
             if self.combat_system and self.fighter_id:
+                # Increment combo first, then get multiplier for this hit
+                self.combat_system.increment_combo(self.fighter_id)
                 combo_multiplier = self.combat_system.get_combo_damage_multiplier(self.fighter_id)
                 damage *= combo_multiplier
-                self.combat_system.increment_combo(self.fighter_id)
             
             target.take_damage(damage, move_data.knockback, move_data.stun, self.facing_right)
             return True 
