@@ -11,4 +11,4 @@ venv/
 Thumbs.db
 
 # Ignore cache files
-ycache/
+ycache/test_basic.py

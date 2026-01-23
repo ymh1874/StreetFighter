@@ -463,7 +463,8 @@ class Fighter:
         
         # Regular attacks
         hitbox_x = self.rect.right if self.facing_right else self.rect.left - move_data.width
-        hitbox_y = self.rect.y + 10
+        # Center hitbox vertically on character (was +10, now centered)
+        hitbox_y = self.rect.y + (self.rect.height - move_data.height) // 2
         
         self.attack_rect = pygame.Rect(hitbox_x, hitbox_y, move_data.width, move_data.height)
         
