@@ -399,8 +399,6 @@ class Game:
         
         # Back button
         self.controls_back_button.draw(self.screen, self.text_renderer)
-        # Back button
-        self.controls_back_button.draw(self.screen, self.text_renderer)
     
     # ==================== ABOUT SCREEN STATE ====================
     

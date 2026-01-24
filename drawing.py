@@ -7,6 +7,10 @@ import pygame
 import math
 import config as c
 
+# Animation constants
+SPINNING_KICK_ROTATION_SPEED = 12  # degrees per frame
+SPINNING_KICK_FRAME_CYCLE = 30  # frames per full rotation cycle
+
 
 def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     """
@@ -84,7 +88,7 @@ def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     elif animation_state == 'special':
         # Spinning kick - both legs in dynamic position
         # Rotation effect - one leg extended high, one tucked
-        angle_offset = (frame % 30) * 12  # Spinning animation
+        angle_offset = (frame % SPINNING_KICK_FRAME_CYCLE) * SPINNING_KICK_ROTATION_SPEED
         kick_leg_x = x + int(35 * math.cos(math.radians(angle_offset))) * flip
         kick_leg_y = y + int(20 - 15 * math.sin(math.radians(angle_offset)))
         pygame.draw.line(surface, c.KHALID_GI, (x, y + 15), (kick_leg_x, kick_leg_y), 8)
