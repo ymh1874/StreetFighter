@@ -38,6 +38,8 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 - **Heavy Kick:** I
 - **Special Move:** U
 - **Dash:** Left Shift
+- **Block:** Hold S (Down)
+- **Parry:** O
 
 ### Player 2
 - **Movement:** Arrow Keys
@@ -47,6 +49,8 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 - **Heavy Kick:** Numpad 4
 - **Special Move:** Numpad 0
 - **Dash:** Right Shift
+- **Block:** Hold Down Arrow
+- **Parry:** Numpad 5
 
 ## ⚡ Combat Mechanics
 
@@ -54,6 +58,14 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 - **Light Attacks:** Fast recovery, can move almost immediately
 - **Heavy Attacks:** Slower recovery, more damage
 - **Special Moves:** 2000ms cooldown, unique per character
+
+### Defense System
+- **Blocking:** Hold down to block attacks. Reduces damage by 75% and knockback by 50%
+- **Parry:** Press parry button for a 6-frame window. Successfully parrying:
+  - Negates all damage
+  - Reflects projectiles back at the attacker
+  - Triggers special visual effect (yellow particles)
+  - Has a 30-frame cooldown between uses
 
 ### Combo System
 - Maximum combo: 5 hits

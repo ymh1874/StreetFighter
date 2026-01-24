@@ -320,6 +320,16 @@ class Fighter:
         self.dash_cooldown = 0
         self.last_dash_time = 0
         
+        # Parry State
+        self.parrying = False
+        self.parry_window = 0  # Frame counter for 6-frame parry window
+        self.parry_success = False
+        self.parry_cooldown = 0
+        
+        # Block State
+        self.blocking = False
+        self.block_damage_reduction = 0.75  # Reduce damage by 75% when blocking
+        
         # Attack history for combos
         self.attack_history = []
 
@@ -409,12 +419,31 @@ class Fighter:
         if self.rect.left + dx < 0: dx = -self.rect.left
         if self.rect.right + dx > width: dx = width - self.rect.right
 
+        # Block handling (hold down to block)
+        if key[self.controls['down']] and not self.jumping and not self.attacking:
+            self.blocking = True
+            self.animation_state = 'block'
+        else:
+            self.blocking = False
+            if self.animation_state == 'block':
+                self.animation_state = 'idle'
+        
+        # Parry handling (tap down quickly for parry)
+        # Update parry window
+        if self.parry_window > 0:
+            self.parry_window -= 1
+            if self.parry_window == 0:
+                self.parrying = False
+
         # Attacks
         current_time = pygame.time.get_ticks()
         if not self.attacking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
-            # PRIORITY: Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
-            if key[self.controls['special']]: 
+            # PRIORITY: Parry > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
+            if key[self.controls.get('parry', pygame.K_o)]:
+                # Activate parry
+                self.activate_parry()
+            elif key[self.controls['special']]: 
                 attack_key = 'special'
             elif key[self.controls.get('heavy_kick', pygame.K_i)]: 
                 attack_key = 'heavy_kick'
@@ -519,9 +548,23 @@ class Fighter:
         return None 
 
     def take_damage(self, amount, knockback, stun, attacker_facing_right):
+        # Check if blocking
+        if self.blocking:
+            amount *= self.block_damage_reduction  # Reduce damage by 75%
+            knockback *= 0.5  # Reduce knockback
+            stun = int(stun * 0.3)  # Reduce stun
+        
+        # Check if parrying (within parry window)
+        if self.parrying and self.parry_window > 0:
+            # Successful parry! No damage taken
+            self.parry_success = True
+            self.color_flash = 10  # Longer flash for parry
+            return True  # Return True to indicate parry success
+        
         self.health -= amount
         self.hit_stun = stun
         self.attacking = False 
+        self.blocking = False  # Stop blocking when hit
         self.color_flash = 5 
         
         # Reset this fighter's combo when taking damage
@@ -534,6 +577,23 @@ class Fighter:
         if self.health <= 0:
             self.health = 0
             self.alive = False
+        
+        return False  # Return False to indicate normal damage taken
+    
+    def activate_parry(self):
+        """Activate parry with 6-frame window
+        
+        Can be activated while blocking (as an enhanced defensive option)
+        but not while attacking.
+        """
+        if not self.attacking and self.parry_cooldown <= 0:
+            self.parrying = True
+            self.parry_window = 6  # 6-frame parry window
+            self.parry_success = False
+            self.parry_cooldown = 30  # 30-frame cooldown between parries
+            self.animation_state = 'block'  # Use block animation for parry
+            return True
+        return False
 
     def update(self):
         if self.attacking:
@@ -549,6 +609,10 @@ class Fighter:
 
         if self.color_flash > 0:
             self.color_flash -= 1
+        
+        # Update parry cooldown
+        if self.parry_cooldown > 0:
+            self.parry_cooldown -= 1
         
         self.animation_frame += 1
 

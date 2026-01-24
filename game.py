@@ -234,6 +234,11 @@ class Game:
         # Game over screen
         elif self.state == "GAME_OVER":
             if key == pygame.K_RETURN:
+                # Reset character selection for next game
+                self.p1_selected = False
+                self.p2_selected = False
+                self.p1_cursor = 0
+                self.p2_cursor = 0
                 self.state = "MAIN_MENU"
     
     # ==================== MAIN MENU STATE ====================
@@ -511,22 +516,31 @@ class Game:
         controls_p1 = c.DEFAULT_P1_CONTROLS
         controls_p2 = c.DEFAULT_P2_CONTROLS
         
-        # Create fighters
+        # Create fighters at proper ground positions
         stats_p1 = c.CHARACTERS[self.p1_cursor]
         stats_p2 = c.CHARACTERS[self.p2_cursor]
         
-        self.p1 = Fighter(200, 200, stats_p1, controls_p1, is_p2=False, combat_system=self.combat_system, fighter_id="p1")
-        self.p2 = Fighter(550, 200, stats_p2, controls_p2, is_p2=True, combat_system=self.combat_system, fighter_id="p2")
+        # Spawn fighters on the ground (FLOOR_Y - P_HEIGHT)
+        spawn_y = c.FLOOR_Y - c.P_HEIGHT
+        self.p1 = Fighter(200, spawn_y, stats_p1, controls_p1, is_p2=False, combat_system=self.combat_system, fighter_id="p1")
+        self.p2 = Fighter(550, spawn_y, stats_p2, controls_p2, is_p2=True, combat_system=self.combat_system, fighter_id="p2")
         
         # Register fighters with combat system for combo tracking
         self.combat_system.register_fighter("p1")
         self.combat_system.register_fighter("p2")
         
-        # Reset fight variables
+        # Reset ALL fight variables and clear leftover effects
         self.round_timer = 99
         self.particles = []
-        self.projectiles = []  # Add projectiles list
-        self.special_effects = []  # Add special effects list
+        self.projectiles = []
+        self.special_effects = []
+        self.hit_effects = []  # Clear hit effects from previous game
+        self.screen_shake = 0  # Reset screen shake
+        self.ko_slowdown = False
+        self.slowdown_timer = 0
+        self.winner_sequence_active = False
+        self.winner_sequence_frame = 0
+        
         self.state = "FIGHT"
         self.last_timer_update = pygame.time.get_ticks()
     
@@ -539,38 +553,38 @@ class Game:
         
         # Check win conditions
         if self.p1.health <= 0 or self.p2.health <= 0 or self.round_timer <= 0:
-            # Add KO effect
+            # Add KO effect and start winner sequence
             if self.p1.health <= 0:
                 self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
-                self.ko_slowdown = True
-                self.slowdown_timer = 30
-                self.winner_sequence_active = True
+                if not self.winner_sequence_active:
+                    self.winner_sequence_active = True
+                    self.winner_sequence_frame = 0
             elif self.p2.health <= 0:
                 self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
-                self.ko_slowdown = True
-                self.slowdown_timer = 30
-                self.winner_sequence_active = True
-            
-            if self.slowdown_timer <= 0 and not self.winner_sequence_active:
-                self.state = "GAME_OVER"
+                if not self.winner_sequence_active:
+                    self.winner_sequence_active = True
+                    self.winner_sequence_frame = 0
+            elif self.round_timer <= 0:
+                if not self.winner_sequence_active:
+                    self.winner_sequence_active = True
+                    self.winner_sequence_frame = 0
         
-        # Winner sequence animation
+        # Winner sequence animation - exactly 3 seconds (180 frames at 60fps)
         if self.winner_sequence_active:
             self.winner_sequence_frame += 1
-            if self.winner_sequence_frame > 180:  # 3 seconds at 60fps
+            
+            # Slow motion effect: Skip update on even frames for first 30 frames
+            # This creates a slow-mo effect by updating game state at half speed
+            is_in_slowmo_window = self.winner_sequence_frame <= 30
+            is_even_frame = self.winner_sequence_frame % 2 == 0
+            if is_in_slowmo_window and is_even_frame:
+                return  # Skip this update to create slow motion
+            
+            if self.winner_sequence_frame >= 180:  # Exactly 3 seconds
                 self.state = "GAME_OVER"
                 self.winner_sequence_active = False
                 self.winner_sequence_frame = 0
             return  # Don't update fight during winner sequence
-        
-        # Slow motion on KO
-        if self.ko_slowdown:
-            self.slowdown_timer -= 1
-            if self.slowdown_timer <= 0:
-                self.ko_slowdown = False
-            # Skip update every other frame for slow motion
-            if self.slowdown_timer % 2 == 0:
-                return
         
         # Update screen shake
         if self.screen_shake > 0:
@@ -613,31 +627,51 @@ class Game:
             # Check collision with fighters
             proj_rect = proj.get_rect()
             if proj.owner == self.p1 and proj_rect.colliderect(self.p2.rect):
-                # Apply combo damage scaling
-                damage = proj.damage
-                if self.p1.combat_system and self.p1.fighter_id:
-                    self.p1.combat_system.increment_combo(self.p1.fighter_id)
-                    combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
-                    damage *= combo_multiplier
-                
-                self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
-                self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
-                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
-                self.screen_shake = 8
-                proj.active = False
+                # Check if p2 is parrying
+                if self.p2.parrying and self.p2.parry_window > 0:
+                    # Successful parry - reflect projectile
+                    proj.vel_x = -proj.vel_x  # Reverse horizontal velocity
+                    proj.owner = self.p2  # Change ownership to p2
+                    self.p2.parry_success = True
+                    self.p2.color_flash = 10
+                    self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.YELLOW)
+                    self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'parry', c.YELLOW))
+                else:
+                    # Apply combo damage scaling
+                    damage = proj.damage
+                    if self.p1.combat_system and self.p1.fighter_id:
+                        self.p1.combat_system.increment_combo(self.p1.fighter_id)
+                        combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
+                        damage *= combo_multiplier
+                    
+                    self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
+                    self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
+                    self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
+                    self.screen_shake = 8
+                    proj.active = False
             elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
-                # Apply combo damage scaling
-                damage = proj.damage
-                if self.p2.combat_system and self.p2.fighter_id:
-                    self.p2.combat_system.increment_combo(self.p2.fighter_id)
-                    combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
-                    damage *= combo_multiplier
-                
-                self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
-                self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
-                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
-                self.screen_shake = 8
-                proj.active = False
+                # Check if p1 is parrying
+                if self.p1.parrying and self.p1.parry_window > 0:
+                    # Successful parry - reflect projectile
+                    proj.vel_x = -proj.vel_x  # Reverse horizontal velocity
+                    proj.owner = self.p1  # Change ownership to p1
+                    self.p1.parry_success = True
+                    self.p1.color_flash = 10
+                    self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.YELLOW)
+                    self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'parry', c.YELLOW))
+                else:
+                    # Apply combo damage scaling
+                    damage = proj.damage
+                    if self.p2.combat_system and self.p2.fighter_id:
+                        self.p2.combat_system.increment_combo(self.p2.fighter_id)
+                        combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
+                        damage *= combo_multiplier
+                    
+                    self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
+                    self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
+                    self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
+                    self.screen_shake = 8
+                    proj.active = False
         
         # Update special effects
         for effect in self.special_effects[:]:
