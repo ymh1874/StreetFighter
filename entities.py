@@ -328,7 +328,9 @@ class Fighter:
         
         # Block State
         self.blocking = False
-        self.block_damage_reduction = 0.75  # Reduce damage by 75% when blocking
+        self.block_start_time = 0  # Track when block started
+        self.block_usage_count = 0  # Track how many times block has been used in current session
+        self.block_damage_reduction = 1.0  # Start at 100% reduction (1.0 = block all damage)
         
         # Attack history for combos
         self.attack_history = []
@@ -420,13 +422,29 @@ class Fighter:
         if self.rect.right + dx > width: dx = width - self.rect.right
 
         # Block handling (hold down to block)
+        # Block can only last max duration and effectiveness degrades
+        current_time = pygame.time.get_ticks()
         if key[self.controls['down']] and not self.jumping and not self.attacking:
-            self.blocking = True
-            self.animation_state = 'block'
+            if not self.blocking:
+                # Starting a new block
+                self.blocking = True
+                self.block_start_time = current_time
+                self.animation_state = 'block'
+                # Update block damage reduction based on usage count using config
+                usage_idx = min(self.block_usage_count, len(c.BLOCK_EFFECTIVENESS_LEVELS) - 1)
+                self.block_damage_reduction = c.BLOCK_EFFECTIVENESS_LEVELS[usage_idx]
+            else:
+                # Already blocking - check if max duration has passed
+                if current_time - self.block_start_time > c.BLOCK_DURATION_MS:
+                    self.blocking = False
+                    self.animation_state = 'idle'
+                    self.block_usage_count += 1
         else:
-            self.blocking = False
-            if self.animation_state == 'block':
+            if self.blocking:
+                # Released block button
+                self.blocking = False
                 self.animation_state = 'idle'
+                self.block_usage_count += 1
         
         # Parry handling (tap down quickly for parry)
         # Update parry window
@@ -435,9 +453,9 @@ class Fighter:
             if self.parry_window == 0:
                 self.parrying = False
 
-        # Attacks
+        # Attacks - can't attack while blocking
         current_time = pygame.time.get_ticks()
-        if not self.attacking and current_time - self.last_attack_time > self.attack_cooldown:
+        if not self.attacking and not self.blocking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
             # PRIORITY: Parry > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
             if key[self.controls.get('parry', pygame.K_o)]:
@@ -550,7 +568,8 @@ class Fighter:
     def take_damage(self, amount, knockback, stun, attacker_facing_right):
         # Check if blocking
         if self.blocking:
-            amount *= self.block_damage_reduction  # Reduce damage by 75%
+            # Apply damage reduction: 1.0 = 100% blocked (0% damage taken), 0.5 = 50% blocked (50% damage taken), etc.
+            amount *= (1.0 - self.block_damage_reduction)
             knockback *= 0.5  # Reduce knockback
             stun = int(stun * 0.3)  # Reduce stun
         
@@ -585,12 +604,13 @@ class Fighter:
         
         Can be activated while blocking (as an enhanced defensive option)
         but not while attacking.
+        Cooldown is 5 seconds (300 frames at 60fps).
         """
         if not self.attacking and self.parry_cooldown <= 0:
             self.parrying = True
-            self.parry_window = 6  # 6-frame parry window
+            self.parry_window = c.PARRY_WINDOW_FRAMES
             self.parry_success = False
-            self.parry_cooldown = 30  # 30-frame cooldown between parries
+            self.parry_cooldown = c.PARRY_COOLDOWN_FRAMES
             self.animation_state = 'block'  # Use block animation for parry
             return True
         return False

@@ -15,23 +15,15 @@ from ai_controller import AIController
 from game import Game
 
 def test_coin_insertion_state():
-    """Test that coin insertion state is properly initialized"""
+    """Test that 2-player mode is enabled by default (no coin insertion needed)"""
     pygame.init()
     
     game = Game()
     
-    # Initial state should have P2 as AI
-    assert game.p2_is_ai == True, "P2 should start as AI"
-    assert game.p2_coin_inserted == False, "Coin should not be inserted initially"
+    # P2 coin should be inserted by default (instant 2-player mode)
+    assert game.p2_coin_inserted == True, "Coin should be inserted by default for instant 2-player mode"
     
-    # Simulate coin insertion
-    game.p2_coin_inserted = True
-    game.p2_is_ai = False
-    
-    assert game.p2_coin_inserted == True, "Coin should be inserted after activation"
-    assert game.p2_is_ai == False, "P2 should not be AI after coin insertion"
-    
-    print("✓ Coin insertion state test passed")
+    print("✓ Instant 2-player mode test passed")
 
 def test_mid_air_dash():
     """Test that dash works while jumping (mid-air dash)"""
@@ -80,7 +72,7 @@ def test_parry_mechanics():
     assert result == True, "Parry should activate successfully"
     assert fighter.parrying == True, "Parrying flag should be set"
     assert fighter.parry_window == 6, "Parry window should be 6 frames"
-    assert fighter.parry_cooldown == 30, "Parry cooldown should be 30 frames"
+    assert fighter.parry_cooldown == 300, "Parry cooldown should be 300 frames (5 seconds at 60fps)"
     
     # Test cooldown prevents immediate re-parry
     result2 = fighter.activate_parry()

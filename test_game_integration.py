@@ -66,16 +66,16 @@ def test_character_selection_flow():
     
     assert g.p1_selected, "P1 should be selected"
     
-    # Without coin, P2 should auto-select as AI
-    if g.p2_is_ai and g.p1_selected and not g.p2_selected:
-        g.p2_selected = True
+    # P2 is human controlled (instant 2-player mode)
+    g.p2_cursor = 1
+    g.p2_selected = True
     
-    assert g.p2_selected, "P2 (AI) should auto-select"
+    assert g.p2_selected, "P2 should be selected"
     
     print("✓ Character selection flow test passed")
 
 def test_fight_initialization_with_ai():
-    """Test fight initialization with AI opponent"""
+    """Test fight initialization"""
     g = setup_game()
     g.state = "CHARACTER_SELECT"
     
@@ -88,7 +88,6 @@ def test_fight_initialization_with_ai():
     g.p2_cursor = 1
     g.p1_selected = True
     g.p2_selected = True
-    g.p2_is_ai = True  # Ensure AI is active
     
     # Start fight
     g._start_fight()
@@ -97,13 +96,12 @@ def test_fight_initialization_with_ai():
     assert g.state == "FIGHT", "Should be in fight state"
     assert g.p1 is not None, "P1 fighter should exist"
     assert g.p2 is not None, "P2 fighter should exist"
-    assert g.p2_ai is not None, "P2 AI controller should exist"
     assert g.round_timer == 99, "Round timer should be 99"
     
-    print("✓ Fight initialization with AI test passed")
+    print("✓ Fight initialization test passed")
 
 def test_fight_initialization_with_human():
-    """Test fight initialization with human P2"""
+    """Test fight initialization with two human players"""
     g = setup_game()
     g.state = "CHARACTER_SELECT"
     
@@ -111,13 +109,12 @@ def test_fight_initialization_with_human():
     g.p1_selected = False
     g.p2_selected = False
     
-    # Select characters with coin inserted
+    # Select characters - both human players
     g.p1_cursor = 0
     g.p2_cursor = 1
     g.p1_selected = True
     g.p2_selected = True
-    g.p2_is_ai = False  # Human P2
-    g.p2_coin_inserted = True
+    g.p2_coin_inserted = True  # Instant 2-player mode (always true now)
     
     # Start fight
     g._start_fight()
@@ -126,9 +123,8 @@ def test_fight_initialization_with_human():
     assert g.state == "FIGHT", "Should be in fight state"
     assert g.p1 is not None, "P1 fighter should exist"
     assert g.p2 is not None, "P2 fighter should exist"
-    assert g.p2_ai is None, "P2 AI controller should not exist"
     
-    print("✓ Fight initialization with human test passed")
+    print("✓ Fight initialization with two human players test passed")
 
 def test_combat_system_integration():
     """Test that combat system is properly integrated"""
@@ -191,16 +187,14 @@ def test_reset_on_game_over():
     g.p2_selected = False
     g.p1_cursor = 0
     g.p2_cursor = 0
-    g.p2_coin_inserted = False
-    g.p2_is_ai = True
+    g.p2_coin_inserted = True  # Keep instant 2-player mode
     g.state = "MAIN_MENU"
     
     # Verify reset
     assert g.state == "MAIN_MENU", "Should return to main menu"
     assert not g.p1_selected, "P1 selection should be reset"
     assert not g.p2_selected, "P2 selection should be reset"
-    assert g.p2_is_ai, "P2 should be AI again"
-    assert not g.p2_coin_inserted, "Coin should not be inserted"
+    assert g.p2_coin_inserted, "Instant 2-player mode should remain active"
     
     print("✓ Reset on game over test passed")
 
