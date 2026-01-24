@@ -118,10 +118,10 @@ COMBO_DAMAGE_SCALING = {
 
 # Action names (internal game actions)
 ACTIONS = [
-    'left', 'right', 'jump', 
+    'left', 'right', 'jump', 'down',
     'light_punch', 'heavy_punch', 
     'light_kick', 'heavy_kick', 
-    'special', 'dash'
+    'special', 'dash', 'parry'
 ]
 
 # Default keyboard controls for Player 1
@@ -129,12 +129,14 @@ DEFAULT_P1_CONTROLS = {
     'left': pygame.K_a,
     'right': pygame.K_d,
     'jump': pygame.K_w,
+    'down': pygame.K_s,
     'light_punch': pygame.K_j,
     'heavy_punch': pygame.K_k,
     'light_kick': pygame.K_l,
     'heavy_kick': pygame.K_i,
     'special': pygame.K_u,
-    'dash': pygame.K_LSHIFT
+    'dash': pygame.K_LSHIFT,
+    'parry': pygame.K_o
 }
 
 # Default keyboard controls for Player 2
@@ -142,12 +144,14 @@ DEFAULT_P2_CONTROLS = {
     'left': pygame.K_LEFT,
     'right': pygame.K_RIGHT,
     'jump': pygame.K_UP,
+    'down': pygame.K_DOWN,
     'light_punch': pygame.K_KP1,
     'heavy_punch': pygame.K_KP2,
     'light_kick': pygame.K_KP3,
     'heavy_kick': pygame.K_KP4,
     'special': pygame.K_KP0,
-    'dash': pygame.K_RSHIFT
+    'dash': pygame.K_RSHIFT,
+    'parry': pygame.K_KP5
 }
 
 # Future arcade controls mapping (for reference)

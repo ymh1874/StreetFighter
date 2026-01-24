@@ -613,31 +613,51 @@ class Game:
             # Check collision with fighters
             proj_rect = proj.get_rect()
             if proj.owner == self.p1 and proj_rect.colliderect(self.p2.rect):
-                # Apply combo damage scaling
-                damage = proj.damage
-                if self.p1.combat_system and self.p1.fighter_id:
-                    self.p1.combat_system.increment_combo(self.p1.fighter_id)
-                    combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
-                    damage *= combo_multiplier
-                
-                self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
-                self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
-                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
-                self.screen_shake = 8
-                proj.active = False
+                # Check if p2 is parrying
+                if self.p2.parrying and self.p2.parry_window > 0:
+                    # Successful parry - reflect projectile
+                    proj.vel_x = -proj.vel_x  # Reverse horizontal velocity
+                    proj.owner = self.p2  # Change ownership to p2
+                    self.p2.parry_success = True
+                    self.p2.color_flash = 10
+                    self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.YELLOW)
+                    self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'parry', c.YELLOW))
+                else:
+                    # Apply combo damage scaling
+                    damage = proj.damage
+                    if self.p1.combat_system and self.p1.fighter_id:
+                        self.p1.combat_system.increment_combo(self.p1.fighter_id)
+                        combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
+                        damage *= combo_multiplier
+                    
+                    self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
+                    self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
+                    self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
+                    self.screen_shake = 8
+                    proj.active = False
             elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
-                # Apply combo damage scaling
-                damage = proj.damage
-                if self.p2.combat_system and self.p2.fighter_id:
-                    self.p2.combat_system.increment_combo(self.p2.fighter_id)
-                    combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
-                    damage *= combo_multiplier
-                
-                self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
-                self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
-                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
-                self.screen_shake = 8
-                proj.active = False
+                # Check if p1 is parrying
+                if self.p1.parrying and self.p1.parry_window > 0:
+                    # Successful parry - reflect projectile
+                    proj.vel_x = -proj.vel_x  # Reverse horizontal velocity
+                    proj.owner = self.p1  # Change ownership to p1
+                    self.p1.parry_success = True
+                    self.p1.color_flash = 10
+                    self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.YELLOW)
+                    self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'parry', c.YELLOW))
+                else:
+                    # Apply combo damage scaling
+                    damage = proj.damage
+                    if self.p2.combat_system and self.p2.fighter_id:
+                        self.p2.combat_system.increment_combo(self.p2.fighter_id)
+                        combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
+                        damage *= combo_multiplier
+                    
+                    self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
+                    self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
+                    self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
+                    self.screen_shake = 8
+                    proj.active = False
         
         # Update special effects
         for effect in self.special_effects[:]:
