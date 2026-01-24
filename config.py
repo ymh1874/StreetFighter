@@ -112,6 +112,15 @@ COMBO_DAMAGE_SCALING = {
     5: 0.8,  # Fifth hit - 80% damage
 }
 
+# Block System Configuration
+# Block effectiveness degrades with usage to prevent spam
+BLOCK_EFFECTIVENESS_LEVELS = [1.0, 0.5, 0.25, 0.0]  # 100% -> 50% -> 25% -> 0%
+BLOCK_DURATION_MS = 3000  # Maximum block duration: 3 seconds
+
+# Parry System Configuration  
+PARRY_COOLDOWN_FRAMES = 300  # 5 seconds at 60fps
+PARRY_WINDOW_FRAMES = 6  # 6-frame parry window
+
 # Control Mapping System
 # This makes it easy to add arcade machine controls later
 # Just update the mapping dictionary without changing game logic

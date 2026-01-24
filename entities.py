@@ -422,7 +422,7 @@ class Fighter:
         if self.rect.right + dx > width: dx = width - self.rect.right
 
         # Block handling (hold down to block)
-        # Block can only last 3 seconds max and effectiveness degrades
+        # Block can only last max duration and effectiveness degrades
         current_time = pygame.time.get_ticks()
         if key[self.controls['down']] and not self.jumping and not self.attacking:
             if not self.blocking:
@@ -430,19 +430,12 @@ class Fighter:
                 self.blocking = True
                 self.block_start_time = current_time
                 self.animation_state = 'block'
-                # Update block damage reduction based on usage count
-                # 100% -> 50% -> 25% -> 0%
-                if self.block_usage_count == 0:
-                    self.block_damage_reduction = 1.0  # 100% damage reduction
-                elif self.block_usage_count == 1:
-                    self.block_damage_reduction = 0.5  # 50% damage reduction
-                elif self.block_usage_count == 2:
-                    self.block_damage_reduction = 0.25  # 25% damage reduction
-                else:
-                    self.block_damage_reduction = 0.0  # No reduction, can't block anymore
+                # Update block damage reduction based on usage count using config
+                usage_idx = min(self.block_usage_count, len(c.BLOCK_EFFECTIVENESS_LEVELS) - 1)
+                self.block_damage_reduction = c.BLOCK_EFFECTIVENESS_LEVELS[usage_idx]
             else:
-                # Already blocking - check if 3 seconds have passed
-                if current_time - self.block_start_time > 3000:  # 3 seconds = 3000ms
+                # Already blocking - check if max duration has passed
+                if current_time - self.block_start_time > c.BLOCK_DURATION_MS:
                     self.blocking = False
                     self.animation_state = 'idle'
                     self.block_usage_count += 1
@@ -575,7 +568,7 @@ class Fighter:
     def take_damage(self, amount, knockback, stun, attacker_facing_right):
         # Check if blocking
         if self.blocking:
-            # Apply damage reduction: 1.0 = 100% blocked (0% damage), 0.5 = 50% blocked (50% damage), etc.
+            # Apply damage reduction: 1.0 = 100% blocked (0% damage taken), 0.5 = 50% blocked (50% damage taken), etc.
             amount *= (1.0 - self.block_damage_reduction)
             knockback *= 0.5  # Reduce knockback
             stun = int(stun * 0.3)  # Reduce stun
@@ -615,9 +608,9 @@ class Fighter:
         """
         if not self.attacking and self.parry_cooldown <= 0:
             self.parrying = True
-            self.parry_window = 6  # 6-frame parry window
+            self.parry_window = c.PARRY_WINDOW_FRAMES
             self.parry_success = False
-            self.parry_cooldown = 300  # 5 seconds = 300 frames at 60fps
+            self.parry_cooldown = c.PARRY_COOLDOWN_FRAMES
             self.animation_state = 'block'  # Use block animation for parry
             return True
         return False
