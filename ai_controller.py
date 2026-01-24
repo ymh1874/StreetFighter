@@ -1,6 +1,11 @@
 """
 AI Controller for Street Fighter Game
 Provides intelligent computer opponents with different difficulty levels
+
+NOTE: This AI controller provides the decision-making logic for computer opponents.
+Some movement control methods are placeholders and would require deeper integration
+with the game's input system. The core AI behaviors (attack selection, strategy,
+defensive actions) are fully implemented and functional.
 """
 
 import pygame
@@ -17,6 +22,10 @@ class AIController:
     - medium: Moderate reactions (200ms), balanced aggression (50%), some parries (15%)
     - hard: Fast reactions (100ms), high aggression (70%), frequent parries (30%)
     - expert: Lightning reactions (50ms), very aggressive (80%), expert parries (50%)
+    
+    NOTE: Movement control methods (_move_towards_opponent, _move_away_from_opponent)
+    are placeholders and would require integration with the Fighter's control system.
+    The attack and defensive behaviors work correctly.
     """
     
     def __init__(self, fighter, opponent, difficulty='hard'):

@@ -581,8 +581,12 @@ class Fighter:
         return False  # Return False to indicate normal damage taken
     
     def activate_parry(self):
-        """Activate parry with 6-frame window"""
-        if not self.blocking and not self.attacking and self.parry_cooldown <= 0:
+        """Activate parry with 6-frame window
+        
+        Can be activated while blocking (as an enhanced defensive option)
+        but not while attacking.
+        """
+        if not self.attacking and self.parry_cooldown <= 0:
             self.parrying = True
             self.parry_window = 6  # 6-frame parry window
             self.parry_success = False

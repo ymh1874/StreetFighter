@@ -572,9 +572,13 @@ class Game:
         # Winner sequence animation - exactly 3 seconds (180 frames at 60fps)
         if self.winner_sequence_active:
             self.winner_sequence_frame += 1
-            # Slow motion effect for first 30 frames
-            if self.winner_sequence_frame <= 30 and self.winner_sequence_frame % 2 == 0:
-                return  # Skip update every other frame for slow motion
+            
+            # Slow motion effect: Skip update on even frames for first 30 frames
+            # This creates a slow-mo effect by updating game state at half speed
+            is_in_slowmo_window = self.winner_sequence_frame <= 30
+            is_even_frame = self.winner_sequence_frame % 2 == 0
+            if is_in_slowmo_window and is_even_frame:
+                return  # Skip this update to create slow motion
             
             if self.winner_sequence_frame >= 180:  # Exactly 3 seconds
                 self.state = "GAME_OVER"
