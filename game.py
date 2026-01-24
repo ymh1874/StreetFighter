@@ -22,7 +22,6 @@ import config as c
 from entities import Fighter, Particle, SpinningKickEffect, HitEffect, Projectile
 from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
 from combat import CombatSystem
-from ai_controller import AIController
 import drawing
 
 
@@ -111,13 +110,11 @@ class Game:
         self.p1_selected = False
         self.p2_selected = False
         self.p2_coin_inserted = False  # Requires coin insertion for P2
-        self.p2_is_ai = True  # P2 starts as AI by default
         
     def _init_fight_screen(self):
         """Initialize fight screen variables"""
         self.p1 = None
         self.p2 = None
-        self.p2_ai = None  # AI controller for P2 if needed
         self.round_timer = 99
         self.last_timer_update = 0
         self.particles = []
@@ -221,7 +218,6 @@ class Game:
             if key == pygame.K_5:
                 if not self.p2_coin_inserted:
                     self.p2_coin_inserted = True
-                    self.p2_is_ai = False
                     
             # P1 controls
             if not self.p1_selected:
@@ -233,17 +229,13 @@ class Game:
                     self.p1_selected = True
             
             # P2 controls (only if coin inserted)
-            if not self.p2_selected and self.p2_coin_inserted and not self.p2_is_ai:
+            if not self.p2_selected and self.p2_coin_inserted:
                 if key == pygame.K_LEFT:
                     self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
                 elif key == pygame.K_RIGHT:
                     self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
                 elif key == pygame.K_KP1:
                     self.p2_selected = True
-            
-            # Auto-select for AI
-            if self.p2_is_ai and self.p1_selected and not self.p2_selected:
-                self.p2_selected = True
                     
         # Game over screen
         elif self.state == "GAME_OVER":
@@ -254,7 +246,6 @@ class Game:
                 self.p1_cursor = 0
                 self.p2_cursor = 0
                 self.p2_coin_inserted = False
-                self.p2_is_ai = True
                 self.state = "MAIN_MENU"
     
     # ==================== MAIN MENU STATE ====================
@@ -536,33 +527,22 @@ class Game:
                 # Calculate offset if P1 and P2 are selecting the same character
                 offset = 6 if i == self.p1_cursor else 0
                 
-                # Show different indicator based on coin status
-                if not self.p2_coin_inserted or self.p2_is_ai:
-                    # AI indicator
-                    color = c.PURPLE
-                    pygame.draw.rect(self.screen, color, char_rect.inflate(10 + offset * 2, 10 + offset * 2), 5)
-                    
-                    ai_label = self.text_renderer.render("AI", 'small', c.PURPLE)
-                    label_x = x + box_width // 2 - ai_label.get_width() // 2
-                    y_pos = y + box_height + 78 if i == self.p1_cursor else y + box_height + 60
-                    self.screen.blit(ai_label, (label_x, y_pos))
-                else:
-                    # P2 human player indicator
-                    color = c.YELLOW if self.p2_selected else c.BLUE
-                    pygame.draw.rect(self.screen, color, char_rect.inflate(10 + offset * 2, 10 + offset * 2), 5)
-                    
-                    p2_label = self.text_renderer.render("P2", 'small', c.BLUE)
-                    label_x = x + box_width // 2 - p2_label.get_width() // 2
-                    y_pos = y + box_height + 78 if i == self.p1_cursor else y + box_height + 60
-                    self.screen.blit(p2_label, (label_x, y_pos))
-                    
-                    if self.p2_selected:
+                # P2 human player indicator
+                color = c.YELLOW if self.p2_selected else c.BLUE
+                pygame.draw.rect(self.screen, color, char_rect.inflate(10 + offset * 2, 10 + offset * 2), 5)
+                
+                p2_label = self.text_renderer.render("P2", 'small', c.BLUE)
+                label_x = x + box_width // 2 - p2_label.get_width() // 2
+                y_pos = y + box_height + 78 if i == self.p1_cursor else y + box_height + 60
+                self.screen.blit(p2_label, (label_x, y_pos))
+                
+                if self.p2_selected:
                         ready = self.text_renderer.render("READY!", 'small', c.YELLOW)
                         ready_x = x + box_width // 2 - ready.get_width() // 2
                         self.screen.blit(ready, (ready_x, y_pos + 18))
         
         # Coin insertion prompt
-        if not self.p2_coin_inserted or self.p2_is_ai:
+        if not self.p2_coin_inserted:
             coin_prompt = self.text_renderer.render("PRESS '5' TO INSERT COIN FOR PLAYER 2", 'medium', c.YELLOW)
             coin_x = c.SCREEN_WIDTH // 2 - coin_prompt.get_width() // 2
             self.screen.blit(coin_prompt, (coin_x, 50))
@@ -587,12 +567,6 @@ class Game:
         spawn_y = c.FLOOR_Y - c.P_HEIGHT
         self.p1 = Fighter(200, spawn_y, stats_p1, controls_p1, is_p2=False, combat_system=self.combat_system, fighter_id="p1")
         self.p2 = Fighter(550, spawn_y, stats_p2, controls_p2, is_p2=True, combat_system=self.combat_system, fighter_id="p2")
-        
-        # Initialize AI controller for P2 if needed
-        if self.p2_is_ai:
-            self.p2_ai = AIController(self.p2, self.p1, difficulty='hard')
-        else:
-            self.p2_ai = None
         
         # Register fighters with combat system for combo tracking
         self.combat_system.register_fighter("p1")
@@ -666,10 +640,6 @@ class Game:
         else:
             self.screen_shake_offset = (0, 0)
         
-        # Update AI controller if active
-        if self.p2_ai:
-            self.p2_ai.update(self.projectiles)
-        
         # Update fighters and handle special moves
         result1 = self.p1.move(self.p2, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
         result2 = self.p2.move(self.p1, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
@@ -683,8 +653,8 @@ class Game:
                 elif isinstance(result, SpinningKickEffect):
                     # Special effect (spinning kick)
                     self.special_effects.append(result)
-                elif hasattr(result, 'active'):
-                    # Single projectile
+                elif hasattr(result, 'active') and not isinstance(result, SpinningKickEffect):
+                    # Single projectile (make sure it's not a SpinningKickEffect)
                     self.projectiles.append(result)
         
         self.p1.update()

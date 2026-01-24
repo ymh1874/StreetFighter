@@ -647,6 +647,44 @@ class Fighter:
             eye_x = self.rect.right - 15 if self.facing_right else self.rect.left + 5
             pygame.draw.rect(surface, c.BLACK, (eye_x, self.rect.y + 15, 10, 5))
         
+        # Draw transparent shield when blocking
+        if self.blocking:
+            # Calculate pulsing alpha (optimized - avoid creating surface every frame)
+            pulse = math.sin(self.animation_frame * 0.3)
+            alpha = int(80 + 40 * pulse)
+            
+            # Create temporary surface for transparency
+            shield_w = self.rect.width + 40
+            shield_h = self.rect.height + 40
+            shield_surface = pygame.Surface((shield_w, shield_h), pygame.SRCALPHA)
+            shield_color = (100, 150, 255, alpha)  # Light blue with transparency
+            
+            # Draw oval shield
+            pygame.draw.ellipse(shield_surface, shield_color, (0, 0, shield_w, shield_h))
+            # Add border
+            pygame.draw.ellipse(shield_surface, (150, 200, 255, 200), (0, 0, shield_w, shield_h), 3)
+            
+            surface.blit(shield_surface, (self.rect.x - 20, self.rect.y - 20))
+        
+        # Draw parry indicator when parrying (takes priority over blocking)
+        elif self.parrying and self.parry_window > 0:
+            # Flash yellow shield during parry window (optimized)
+            pulse = math.sin(self.animation_frame * 0.5)
+            alpha = int(150 + 105 * pulse)
+            
+            # Create temporary surface for transparency
+            parry_w = self.rect.width + 30
+            parry_h = self.rect.height + 30
+            parry_surface = pygame.Surface((parry_w, parry_h), pygame.SRCALPHA)
+            parry_color = (255, 255, 0, alpha)  # Yellow with transparency
+            
+            # Draw circular parry indicator
+            pygame.draw.ellipse(parry_surface, parry_color, (0, 0, parry_w, parry_h))
+            # Add bright border
+            pygame.draw.ellipse(parry_surface, (255, 255, 100, 255), (0, 0, parry_w, parry_h), 4)
+            
+            surface.blit(parry_surface, (self.rect.x - 15, self.rect.y - 15))
+        
         # Hitbox Debug View (optional)
         if self.attacking and self.attack_rect:
             s = pygame.Surface((self.attack_rect.width, self.attack_rect.height))
