@@ -109,7 +109,7 @@ class Game:
         self.p2_cursor = 1
         self.p1_selected = False
         self.p2_selected = False
-        self.p2_coin_inserted = False  # Requires coin insertion for P2
+        self.p2_coin_inserted = True  # Instant 2-player mode - no coin required
         
     def _init_fight_screen(self):
         """Initialize fight screen variables"""
@@ -214,11 +214,6 @@ class Game:
                 
         # Character select keyboard controls
         elif self.state == "CHARACTER_SELECT":
-            # Coin insertion for P2 (press '5' key like arcade machines)
-            if key == pygame.K_5:
-                if not self.p2_coin_inserted:
-                    self.p2_coin_inserted = True
-                    
             # P1 controls
             if not self.p1_selected:
                 if key == pygame.K_a:
@@ -228,8 +223,8 @@ class Game:
                 elif key == pygame.K_j:
                     self.p1_selected = True
             
-            # P2 controls (only if coin inserted)
-            if not self.p2_selected and self.p2_coin_inserted:
+            # P2 controls - always available
+            if not self.p2_selected:
                 if key == pygame.K_LEFT:
                     self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
                 elif key == pygame.K_RIGHT:
@@ -245,7 +240,7 @@ class Game:
                 self.p2_selected = False
                 self.p1_cursor = 0
                 self.p2_cursor = 0
-                self.p2_coin_inserted = False
+                self.p2_coin_inserted = True  # Keep 2-player mode enabled
                 self.state = "MAIN_MENU"
     
     # ==================== MAIN MENU STATE ====================
@@ -388,11 +383,6 @@ class Game:
             self.screen.blit(label_surf, (P2_CONTROLS_X, y_offset))
             self.screen.blit(key_surf, (P2_CONTROLS_KEY_X, y_offset))  # Align with label on same line
             y_offset += 22
-        
-        # Coin insertion note
-        coin_note = self.text_renderer.render("PRESS '5' TO INSERT COIN FOR PLAYER 2", 'small', c.GREEN)
-        coin_x = c.SCREEN_WIDTH // 2 - coin_note.get_width() // 2
-        self.screen.blit(coin_note, (coin_x, 100))
         
         # Back button
         self.controls_back_button.draw(self.screen, self.text_renderer)
@@ -541,15 +531,10 @@ class Game:
                         ready_x = x + box_width // 2 - ready.get_width() // 2
                         self.screen.blit(ready, (ready_x, y_pos + 18))
         
-        # Coin insertion prompt
-        if not self.p2_coin_inserted:
-            coin_prompt = self.text_renderer.render("PRESS '5' TO INSERT COIN FOR PLAYER 2", 'medium', c.YELLOW)
-            coin_x = c.SCREEN_WIDTH // 2 - coin_prompt.get_width() // 2
-            self.screen.blit(coin_prompt, (coin_x, 50))
-        else:
-            mode_text = self.text_renderer.render("2 PLAYER MODE", 'medium', c.GREEN)
-            mode_x = c.SCREEN_WIDTH // 2 - mode_text.get_width() // 2
-            self.screen.blit(mode_text, (mode_x, 50))
+        # 2 Player mode indicator
+        mode_text = self.text_renderer.render("2 PLAYER MODE", 'medium', c.GREEN)
+        mode_x = c.SCREEN_WIDTH // 2 - mode_text.get_width() // 2
+        self.screen.blit(mode_text, (mode_x, 50))
     
     # ==================== FIGHT STATE ====================
     
