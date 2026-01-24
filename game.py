@@ -389,7 +389,7 @@ class Game:
             label_surf = self.text_renderer.render(label, 'small', c.WHITE)
             key_surf = self.text_renderer.render(key, 'small', c.YELLOW)
             self.screen.blit(label_surf, (450, y_offset))
-            self.screen.blit(key_surf, (450, y_offset + 16))
+            self.screen.blit(key_surf, (620, y_offset))  # Align with label on same line
             y_offset += 22
         
         # Coin insertion note
