@@ -57,6 +57,15 @@ def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
         pygame.draw.circle(surface, c.KHALID_SKIN, arm_end, 5)
         # Other arm
         pygame.draw.line(surface, c.KHALID_SKIN, (x - 10 * flip, y - 10), (x - 15 * flip, y), 5)
+    elif animation_state == 'special':
+        # Spinning kick pose - arms extended for balance
+        arm_left = (x - 25 * flip, y - 8)
+        arm_right = (x + 25 * flip, y - 8)
+        pygame.draw.line(surface, c.KHALID_SKIN, (x, y - 10), arm_left, 5)
+        pygame.draw.line(surface, c.KHALID_SKIN, (x, y - 10), arm_right, 5)
+        # Fists for balance
+        pygame.draw.circle(surface, c.KHALID_SKIN, arm_left, 4)
+        pygame.draw.circle(surface, c.KHALID_SKIN, arm_right, 4)
     else:
         # Normal arms
         pygame.draw.line(surface, c.KHALID_SKIN, (x - 15, y - 10), (x - 20, y + 5), 5)
@@ -64,14 +73,24 @@ def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     
     # Legs (based on animation state)
     if animation_state in ['kick', 'light_kick', 'heavy_kick']:
-        # Extended leg (kicking)
+        # Extended leg (kicking) - high kick for taekwondo
         leg_start = (x, y + 22)
-        leg_end = (x + 40 * flip, y + 15)
+        leg_end = (x + 40 * flip, y + 10)  # Higher kick
         pygame.draw.line(surface, c.KHALID_GI, leg_start, leg_end, 8)
         # Foot
         pygame.draw.circle(surface, c.KHALID_SKIN, leg_end, 6)
-        # Other leg
+        # Other leg - supporting leg
         pygame.draw.line(surface, c.KHALID_GI, (x, y + 22), (x - 5 * flip, y + 45), 7)
+    elif animation_state == 'special':
+        # Spinning kick - both legs in dynamic position
+        # Rotation effect - one leg extended high, one tucked
+        angle_offset = (frame % 30) * 12  # Spinning animation
+        kick_leg_x = x + int(35 * math.cos(math.radians(angle_offset))) * flip
+        kick_leg_y = y + int(20 - 15 * math.sin(math.radians(angle_offset)))
+        pygame.draw.line(surface, c.KHALID_GI, (x, y + 15), (kick_leg_x, kick_leg_y), 8)
+        pygame.draw.circle(surface, c.KHALID_SKIN, (kick_leg_x, kick_leg_y), 6)
+        # Supporting/tucked leg
+        pygame.draw.line(surface, c.KHALID_GI, (x, y + 22), (x - 8 * flip, y + 35), 7)
     else:
         # Normal legs
         pygame.draw.line(surface, c.KHALID_GI, (x - 8, y + 22), (x - 10, y + 45), 7)

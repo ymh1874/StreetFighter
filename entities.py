@@ -373,9 +373,9 @@ class Fighter:
 
         key = pygame.key.get_pressed()
         
-        # Dash handling
+        # Dash handling - now works in mid-air too
         current_time = pygame.time.get_ticks()
-        if key[self.controls.get('dash', pygame.K_LSHIFT)] and not self.dashing and not self.jumping and current_time - self.last_dash_time > 500:
+        if key[self.controls.get('dash', pygame.K_LSHIFT)] and not self.dashing and current_time - self.last_dash_time > 500:
             self.dashing = True
             self.dash_timer = c.FRAME_DATA['dash']['active']  # 8 frames
             self.last_dash_time = current_time
