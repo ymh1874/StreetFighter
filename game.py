@@ -533,6 +533,9 @@ class Game:
             
             # P2 selection indicator
             if i == self.p2_cursor:
+                # Calculate offset if P1 and P2 are selecting the same character
+                offset = 6 if i == self.p1_cursor else 0
+                
                 # Show different indicator based on coin status
                 if not self.p2_coin_inserted or self.p2_is_ai:
                     # AI indicator

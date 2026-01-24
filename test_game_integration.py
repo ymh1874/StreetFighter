@@ -29,7 +29,7 @@ def test_game_initialization():
     # Verify initial state is valid
     valid_states = ["MAIN_MENU", "CONTROLS", "CHARACTER_SELECT", "ABOUT", "FIGHT", "GAME_OVER"]
     assert g.state in valid_states, f"Game should have valid state, got {g.state}"
-    assert g.running == True, "Game should be running"
+    assert g.running, "Game should be running"
     
     print("✓ Game initialization test passed")
 
@@ -64,13 +64,13 @@ def test_character_selection_flow():
     g.p1_cursor = 0
     g.p1_selected = True
     
-    assert g.p1_selected == True, "P1 should be selected"
+    assert g.p1_selected, "P1 should be selected"
     
     # Without coin, P2 should auto-select as AI
     if g.p2_is_ai and g.p1_selected and not g.p2_selected:
         g.p2_selected = True
     
-    assert g.p2_selected == True, "P2 (AI) should auto-select"
+    assert g.p2_selected, "P2 (AI) should auto-select"
     
     print("✓ Character selection flow test passed")
 
@@ -197,10 +197,10 @@ def test_reset_on_game_over():
     
     # Verify reset
     assert g.state == "MAIN_MENU", "Should return to main menu"
-    assert g.p1_selected == False, "P1 selection should be reset"
-    assert g.p2_selected == False, "P2 selection should be reset"
-    assert g.p2_is_ai == True, "P2 should be AI again"
-    assert g.p2_coin_inserted == False, "Coin should not be inserted"
+    assert not g.p1_selected, "P1 selection should be reset"
+    assert not g.p2_selected, "P2 selection should be reset"
+    assert g.p2_is_ai, "P2 should be AI again"
+    assert not g.p2_coin_inserted, "Coin should not be inserted"
     
     print("✓ Reset on game over test passed")
 
