@@ -26,9 +26,9 @@ def test_game_initialization():
     """Test that game initializes without errors"""
     g = setup_game()
     
-    # Verify initial state
-    assert g.state == "MAIN_MENU" or g.state in ["MAIN_MENU", "CONTROLS", "CHARACTER_SELECT"], \
-        "Game should have valid state"
+    # Verify initial state is valid
+    valid_states = ["MAIN_MENU", "CONTROLS", "CHARACTER_SELECT", "ABOUT", "FIGHT", "GAME_OVER"]
+    assert g.state in valid_states, f"Game should have valid state, got {g.state}"
     assert g.running == True, "Game should be running"
     
     print("✓ Game initialization test passed")

@@ -332,6 +332,12 @@ class Game:
     
     def _draw_controls(self):
         """Render controls screen"""
+        # Layout constants
+        P1_CONTROLS_X = 120
+        P1_CONTROLS_KEY_X = 350
+        P2_CONTROLS_X = 450
+        P2_CONTROLS_KEY_X = 620
+        
         # Title
         title = self.text_renderer.render("GAME CONTROLS", 'large', c.ORANGE)
         title_x = c.SCREEN_WIDTH // 2 - title.get_width() // 2
@@ -345,7 +351,7 @@ class Game:
         # Player 1 controls
         y_offset = 140
         p1_title = self.text_renderer.render("PLAYER 1", 'medium', c.RED)
-        self.screen.blit(p1_title, (120, y_offset))
+        self.screen.blit(p1_title, (P1_CONTROLS_X, y_offset))
         
         y_offset += 35
         controls_p1 = [
@@ -363,14 +369,14 @@ class Game:
         for label, key in controls_p1:
             label_surf = self.text_renderer.render(label, 'small', c.WHITE)
             key_surf = self.text_renderer.render(key, 'small', c.YELLOW)
-            self.screen.blit(label_surf, (120, y_offset))
-            self.screen.blit(key_surf, (350, y_offset))
+            self.screen.blit(label_surf, (P1_CONTROLS_X, y_offset))
+            self.screen.blit(key_surf, (P1_CONTROLS_KEY_X, y_offset))
             y_offset += 22
         
         # Player 2 controls
         y_offset = 140
         p2_title = self.text_renderer.render("PLAYER 2", 'medium', c.BLUE)
-        self.screen.blit(p2_title, (450, y_offset))
+        self.screen.blit(p2_title, (P2_CONTROLS_X, y_offset))
         
         y_offset += 35
         controls_p2 = [
@@ -388,8 +394,8 @@ class Game:
         for label, key in controls_p2:
             label_surf = self.text_renderer.render(label, 'small', c.WHITE)
             key_surf = self.text_renderer.render(key, 'small', c.YELLOW)
-            self.screen.blit(label_surf, (450, y_offset))
-            self.screen.blit(key_surf, (620, y_offset))  # Align with label on same line
+            self.screen.blit(label_surf, (P2_CONTROLS_X, y_offset))
+            self.screen.blit(key_surf, (P2_CONTROLS_KEY_X, y_offset))  # Align with label on same line
             y_offset += 22
         
         # Coin insertion note

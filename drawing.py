@@ -88,6 +88,8 @@ def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     elif animation_state == 'special':
         # Spinning kick - both legs in dynamic position
         # Rotation effect - one leg extended high, one tucked
+        # angle_offset creates circular motion: frame cycles through 0-360 degrees
+        # Formula: (frame % cycle) * speed gives smooth rotation animation
         angle_offset = (frame % SPINNING_KICK_FRAME_CYCLE) * SPINNING_KICK_ROTATION_SPEED
         kick_leg_x = x + int(35 * math.cos(math.radians(angle_offset))) * flip
         kick_leg_y = y + int(20 - 15 * math.sin(math.radians(angle_offset)))
