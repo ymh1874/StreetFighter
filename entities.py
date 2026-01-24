@@ -647,6 +647,38 @@ class Fighter:
             eye_x = self.rect.right - 15 if self.facing_right else self.rect.left + 5
             pygame.draw.rect(surface, c.BLACK, (eye_x, self.rect.y + 15, 10, 5))
         
+        # Draw transparent shield when blocking
+        if self.blocking:
+            shield_surface = pygame.Surface((self.rect.width + 40, self.rect.height + 40), pygame.SRCALPHA)
+            # Draw shield with pulsing alpha based on animation frame
+            alpha = int(80 + 40 * math.sin(self.animation_frame * 0.3))
+            shield_color = (100, 150, 255, alpha)  # Light blue with transparency
+            
+            # Draw oval shield
+            pygame.draw.ellipse(shield_surface, shield_color, 
+                              (0, 0, self.rect.width + 40, self.rect.height + 40))
+            # Add border
+            pygame.draw.ellipse(shield_surface, (150, 200, 255, 200), 
+                              (0, 0, self.rect.width + 40, self.rect.height + 40), 3)
+            
+            surface.blit(shield_surface, (self.rect.x - 20, self.rect.y - 20))
+        
+        # Draw parry indicator when parrying
+        if self.parrying and self.parry_window > 0:
+            # Flash yellow shield during parry window
+            parry_surface = pygame.Surface((self.rect.width + 30, self.rect.height + 30), pygame.SRCALPHA)
+            alpha = int(150 + 105 * math.sin(self.animation_frame * 0.5))
+            parry_color = (255, 255, 0, alpha)  # Yellow with transparency
+            
+            # Draw circular parry indicator
+            pygame.draw.ellipse(parry_surface, parry_color,
+                              (0, 0, self.rect.width + 30, self.rect.height + 30))
+            # Add bright border
+            pygame.draw.ellipse(parry_surface, (255, 255, 100, 255),
+                              (0, 0, self.rect.width + 30, self.rect.height + 30), 4)
+            
+            surface.blit(parry_surface, (self.rect.x - 15, self.rect.y - 15))
+        
         # Hitbox Debug View (optional)
         if self.attacking and self.attack_rect:
             s = pygame.Surface((self.attack_rect.width, self.attack_rect.height))
