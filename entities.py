@@ -312,7 +312,8 @@ class Fighter:
         self.animation_state = 'idle'
         self.animation_frame = 0
         self.special_move_cooldown = 0
-        self.last_special_time = -2000  # Initialize to -2000 to allow immediate special move use
+
+        self.last_special_time = -6000  # Initialize to -6000 to allow immediate special move use
         
         # Dash State
         self.dashing = False
@@ -501,7 +502,7 @@ class Fighter:
         # Handle special moves separately
         if type_key == 'special':
             current_time = pygame.time.get_ticks()
-            if current_time - self.last_special_time >= 2000:
+            if current_time - self.last_special_time >= 4000:
                 self.last_special_time = current_time
                 return self.execute_special_move(target)
             else:

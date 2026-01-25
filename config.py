@@ -19,7 +19,7 @@ GRAY = (100, 100, 100)
 DARK_GRAY = (40, 40, 40)
 
 # Skin tones
-KHALID_SKIN = (101, 67, 33)  # Dark brown
+KHALID_SKIN = (181, 135, 99)  # Light brown
 EDUARDO_SKIN = (210, 180, 140)  # Tan
 HASAN_SKIN = (194, 140, 80)  # Medium brown
 HAMMOUD_SKIN = (220, 190, 150)  # Light tan
@@ -34,7 +34,7 @@ HAMMOUD_COAT = (34, 139, 34)  # Green
 # Effect colors
 COMIC_TEXT = (255, 255, 0)  # Yellow for "POW!"
 COMIC_OUTLINE = (0, 0, 0)  # Black outline
-DIRT_BROWN = (139, 90, 43)  # Dirt brown ground
+DIRT_BROWN = (139, 90, 43)  # Dirt brown ground 
 
 # Physics Defaults
 GRAVITY = 0.8
@@ -42,21 +42,22 @@ FLOOR_Y = SCREEN_HEIGHT - 100
 P_WIDTH = 50
 P_HEIGHT = 100
 
-# Professor Character Definitions
+# Character Definitions
 CHARACTERS = [
     {
-        'name': 'PROF. KHALID', 
+        'name': 'KHALID', 
         'color': KHALID_GI,
         'skin': KHALID_SKIN,
         'speed': 6, 
         'jump': -19, 
         'health': 110, 
         'dmg_mult': 1.0, 
+    
         'desc': 'TAEKWONDO MASTER',
         'special': 'spinning_kick'
     },
     {
-        'name': 'PROF. EDUARDO', 
+        'name': 'EDUARDO', 
         'color': EDUARDO_APRON,
         'skin': EDUARDO_SKIN,
         'speed': 5, 
@@ -67,7 +68,7 @@ CHARACTERS = [
         'special': 'pizza_throw'
     },
     {
-        'name': 'PROF. HASAN', 
+        'name': 'HASAN', 
         'color': HASAN_ROBE,
         'skin': HASAN_SKIN,
         'speed': 5, 
@@ -78,7 +79,7 @@ CHARACTERS = [
         'special': 'fireball'
     },
     {
-        'name': 'PROF. HAMMOUD', 
+        'name': 'HAMMOUD', 
         'color': HAMMOUD_COAT,
         'skin': HAMMOUD_SKIN,
         'speed': 7, 

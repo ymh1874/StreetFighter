@@ -15,12 +15,6 @@ SPINNING_KICK_FRAME_CYCLE = 30  # frames per full rotation cycle
 def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     """
     Draw Professor Khalid - The Taekwondo Master
-    
-    Appearance:
-    - Slick back black hair
-    - Clean shaven, dark brown skin
-    - Orange taekwondo gi
-    - Athletic build
     """
     # Flip x offset based on facing direction
     flip = 1 if facing_right else -1
@@ -30,14 +24,9 @@ def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
     head_y = int(y - 30)
     pygame.draw.circle(surface, c.KHALID_SKIN, (head_x, head_y), 12)
     
-    # Hair (slicked back - polygon)
-    hair_points = [
-        (head_x - 10 * flip, head_y),
-        (head_x + 10 * flip, head_y),
-        (head_x + 8 * flip, head_y - 10),
-        (head_x - 8 * flip, head_y - 10)
-    ]
-    pygame.draw.polygon(surface, c.BLACK, hair_points)
+    # Hair (curved semicircle)
+    hair_rect = pygame.Rect(head_x - 12, head_y - 14, 24, 14)
+    pygame.draw.arc(surface, c.BLACK, hair_rect, math.pi, 2 * math.pi, 8)
     
     # Eyes
     eye_offset = 4 if facing_right else -4
@@ -112,12 +101,7 @@ def draw_eduardo(surface, x, y, facing_right, animation_state='idle', frame=0):
     """
     Draw Professor Eduardo - The Pizza Master
     
-    Appearance:
-    - Some hair in back (balding front)
-    - Clean shaven, tan skin
-    - Red apron, white chef hat
-    - Slightly chubby build
-    """
+"""
     flip = 1 if facing_right else -1
     
     # Head (circle, tan skin)
@@ -131,12 +115,7 @@ def draw_eduardo(surface, x, y, facing_right, animation_state='idle', frame=0):
     hat_band = pygame.Rect(x - 14, y - 40, 28, 6)
     pygame.draw.rect(surface, c.EDUARDO_HAT, hat_band)
     
-    # Hair in back (small tuft)
-    if not facing_right:
-        pygame.draw.circle(surface, c.BLACK, (head_x - 11, head_y + 3), 4)
-    else:
-        pygame.draw.circle(surface, c.BLACK, (head_x + 11, head_y + 3), 4)
-    
+
     # Eyes
     eye_offset = 4 if facing_right else -4
     pygame.draw.circle(surface, c.BLACK, (head_x + eye_offset, head_y - 2), 2)
@@ -184,12 +163,7 @@ def draw_eduardo(surface, x, y, facing_right, animation_state='idle', frame=0):
 def draw_hasan(surface, x, y, facing_right, animation_state='idle', frame=0):
     """
     Draw Professor Hasan - The Pyromancer
-    
-    Appearance:
-    - Completely bald
-    - No facial hair
-    - Floor-length yellow/orange wizard robes
-    - Glowing eyes when using powers
+
     """
     flip = 1 if facing_right else -1
     
@@ -244,12 +218,7 @@ def draw_hasan(surface, x, y, facing_right, animation_state='idle', frame=0):
 def draw_hammoud(surface, x, y, facing_right, animation_state='idle', frame=0):
     """
     Draw Professor Hammoud - The Tech Wizard
-    
-    Appearance:
-    - Short buzz cut
-    - Modern rectangular glasses
-    - Clean green lab coat
-    - Lean, intellectual build
+
     """
     flip = 1 if facing_right else -1
     

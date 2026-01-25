@@ -487,17 +487,6 @@ class Game:
             name_x = x + box_width // 2 - name.get_width() // 2
             self.screen.blit(name, (name_x, y + box_height + 8))
             
-            # Description - centered, extra small (use smaller font)
-            desc = self.text_renderer.render(char['desc'], 'small', c.GRAY)
-            desc_x = x + box_width // 2 - desc.get_width() // 2
-            self.screen.blit(desc, (desc_x, y + box_height + 28))
-            
-            # Stats - centered, extra small
-            stats = f"HP:{char['health']} SPD:{char['speed']}"
-            stats_surf = self.text_renderer.render(stats, 'small', c.GRAY)
-            stats_x = x + box_width // 2 - stats_surf.get_width() // 2
-            self.screen.blit(stats_surf, (stats_x, y + box_height + 42))
-            
             # P1 selection indicator
             if i == self.p1_cursor:
                 color = c.YELLOW if self.p1_selected else c.RED
@@ -531,10 +520,10 @@ class Game:
                         ready_x = x + box_width // 2 - ready.get_width() // 2
                         self.screen.blit(ready, (ready_x, y_pos + 18))
         
-        # 2 Player mode indicator
-        mode_text = self.text_renderer.render("2 PLAYER MODE", 'medium', c.GREEN)
-        mode_x = c.SCREEN_WIDTH // 2 - mode_text.get_width() // 2
-        self.screen.blit(mode_text, (mode_x, 50))
+        # 2 Player mode indicator not used
+        # mode_text = self.text_renderer.render("2 PLAYER MODE", 'medium', c.GREEN)
+        # mode_x = c.SCREEN_WIDTH // 2 - mode_text.get_width() // 2
+        # self.screen.blit(mode_text, (mode_x, 50))
     
     # ==================== FIGHT STATE ====================
     
