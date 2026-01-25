@@ -164,19 +164,68 @@ DEFAULT_P2_CONTROLS = {
     'parry': pygame.K_KP5
 }
 
-# Future arcade controls mapping (for reference)
-# To add arcade controls, map joystick/button inputs to pygame key constants
-# Example arcade mapping (not yet implemented):
-# ARCADE_P1_CONTROLS = {
-#     'left': JOYSTICK1_LEFT,
-#     'right': JOYSTICK1_RIGHT,
-#     'jump': JOYSTICK1_UP,
-#     'light_punch': BUTTON_X,
-#     'heavy_punch': BUTTON_Y,
-#     'light_kick': BUTTON_B,
-#     'heavy_kick': BUTTON_A,
-#     'special': BUTTON_SELECT,
-#     'dash': BUTTON_START
-# }
-# ARCADE_P2_CONTROLS = {...}
-# ARCADE_RESET = RESET_BUTTON
+# Arcade Box Control Mapping
+# Based on the CMU arcade-box-startercode Key-Map:
+# | Key          | Button |
+# |--------------|--------|
+# | b            | 0      |
+# | a            | 1      |
+# | x            | 2      |
+# | y            | 3      |
+# | Insert money | 4      |
+# | p1 (RESET)   | 5      |
+# | Select       | 8      |
+# | Start        | 9      |
+#
+# Joystick Axis:
+# - Axis 0: Left/Right (-1 left, 1 right)
+# - Axis 1: Up/Down (-1 up, 1 down)
+
+# Arcade button string mappings for Player 1 (joystick 0)
+ARCADE_P1_BUTTONS = {
+    'light_punch': '0',   # b button
+    'heavy_punch': '1',   # a button
+    'light_kick': '2',    # x button
+    'heavy_kick': '3',    # y button
+    'special': '4',       # Insert money button
+    'dash': '8',          # Select button
+    'parry': '9',         # Start button
+}
+
+# Arcade axis mappings (axis_id, direction)
+ARCADE_P1_AXIS = {
+    'left': (0, -1),      # Axis 0, negative = left
+    'right': (0, 1),      # Axis 0, positive = right  
+    'jump': (1, -1),      # Axis 1, negative = up (jump)
+    'down': (1, 1),       # Axis 1, positive = down
+}
+
+# Arcade button string mappings for Player 2 (joystick 1)
+# Same button layout but on second joystick
+ARCADE_P2_BUTTONS = {
+    'light_punch': '0',
+    'heavy_punch': '1',
+    'light_kick': '2',
+    'heavy_kick': '3',
+    'special': '4',
+    'dash': '8',
+    'parry': '9',
+}
+
+ARCADE_P2_AXIS = {
+    'left': (0, -1),
+    'right': (0, 1),
+    'jump': (1, -1),
+    'down': (1, 1),
+}
+
+# Reset button - P1 button (5) on any joystick quits the game
+ARCADE_RESET_BUTTON = '5'
+
+# Hat/DPAD button mappings (for PS4/Switch controllers)
+HAT_BUTTONS = {
+    'H0': 'jump',   # Hat up = jump
+    'H1': 'right',  # Hat right = move right
+    'H2': 'down',   # Hat down = crouch/block
+    'H3': 'left',   # Hat left = move left
+}

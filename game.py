@@ -10,6 +10,11 @@ Game States:
 - FIGHT: Main fighting gameplay
 - GAME_OVER: End game screen
 
+Supports:
+- Keyboard controls (Player 1: WASD + JKLIU, Player 2: Arrows + Numpad)
+- Arcade Box joystick controls (CMU arcade-box compatible)
+- PS4/PS5 and Nintendo Switch controllers
+
 Author: Senior Game Developer
 Date: 2026
 """
@@ -23,6 +28,7 @@ from entities import Fighter, Particle, SpinningKickEffect, HitEffect, Projectil
 from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
 from combat import CombatSystem
 import drawing
+import joystick
 
 
 class Game:
@@ -46,6 +52,21 @@ class Game:
         # Core game components
         self.clock = pygame.time.Clock()
         self.text_renderer = VintageTextRenderer()
+        
+        # Initialize joystick/arcade box support
+        joystick.init()
+        joystick.set_callbacks(
+            on_press=self._on_joy_press,
+            on_release=self._on_joy_release,
+            on_hold=self._on_joy_button_hold,
+            on_digital_axis=self._on_digital_joy_axis
+        )
+        
+        # Track joystick input state for fighters
+        self.joy_input_state = {
+            0: {'buttons': set(), 'axis': set()},  # Player 1 joystick
+            1: {'buttons': set(), 'axis': set()},  # Player 2 joystick
+        }
         
         # Visual effects
         self.scanlines = ScanlineEffect(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
@@ -150,6 +171,12 @@ class Game:
                         
                 if event.type == pygame.KEYDOWN:
                     self._handle_keypress(event.key)
+                
+                # Handle joystick events
+                joystick.handle_event(event)
+            
+            # Update joystick hold states
+            joystick.update()
             
             # ===== STATE-BASED UPDATE AND RENDERING =====
             if self.state == "MAIN_MENU":
@@ -184,6 +211,7 @@ class Game:
             pygame.display.flip()
         
         # Cleanup
+        joystick.quit()
         pygame.quit()
         sys.exit()
     
@@ -242,6 +270,185 @@ class Game:
                 self.p2_cursor = 0
                 self.p2_coin_inserted = True  # Keep 2-player mode enabled
                 self.state = "MAIN_MENU"
+    
+    # ==================== JOYSTICK INPUT HANDLING ====================
+    
+    def _on_joy_press(self, button, joystick_id):
+        """
+        Handle joystick button press events.
+        Called when any button is pressed on any connected joystick.
+        
+        Args:
+            button: String representing the button (e.g., '0', '1', 'H0')
+            joystick_id: ID of the joystick that triggered the event
+        """
+        # RESET BUTTON - P1 button (5) quits the game on any joystick
+        if button == c.ARCADE_RESET_BUTTON:
+            print("Reset button pressed - exiting game")
+            joystick.quit()
+            pygame.quit()
+            sys.exit(0)
+        
+        # Track button state
+        if joystick_id in self.joy_input_state:
+            self.joy_input_state[joystick_id]['buttons'].add(button)
+        
+        # Handle menu/character select navigation
+        if self.state == "MAIN_MENU":
+            self._handle_joy_menu(button, joystick_id)
+        elif self.state == "CHARACTER_SELECT":
+            self._handle_joy_character_select(button, joystick_id)
+        elif self.state == "GAME_OVER":
+            # Any button to continue
+            if button in ['0', '1', '9']:  # b, a, or Start
+                self.p1_selected = False
+                self.p2_selected = False
+                self.p1_cursor = 0
+                self.p2_cursor = 0
+                self.p2_coin_inserted = True
+                self.state = "MAIN_MENU"
+    
+    def _on_joy_release(self, button, joystick_id):
+        """
+        Handle joystick button release events.
+        
+        Args:
+            button: String representing the button
+            joystick_id: ID of the joystick that triggered the event
+        """
+        # Remove from tracked state
+        if joystick_id in self.joy_input_state:
+            self.joy_input_state[joystick_id]['buttons'].discard(button)
+    
+    def _on_joy_button_hold(self, buttons, joystick_id):
+        """
+        Handle joystick button hold events (called each frame while held).
+        
+        Args:
+            buttons: List of button strings currently held
+            joystick_id: ID of the joystick
+        """
+        # Update tracked state
+        if joystick_id in self.joy_input_state:
+            self.joy_input_state[joystick_id]['buttons'] = set(buttons)
+    
+    def _on_digital_joy_axis(self, results, joystick_id):
+        """
+        Handle digital joystick axis events.
+        Results are tuples of (axis, direction) where:
+        - axis 0: left/right, axis 1: up/down
+        - direction -1: left/up, direction 1: right/down
+        
+        Args:
+            results: List of (axis, direction) tuples for active movements
+            joystick_id: ID of the joystick
+        """
+        # Update tracked state
+        if joystick_id in self.joy_input_state:
+            self.joy_input_state[joystick_id]['axis'] = set(results)
+        
+        # Handle menu/character select navigation
+        if self.state == "MAIN_MENU":
+            for axis, direction in results:
+                if axis == 1:  # Up/Down
+                    if direction == -1:  # Up
+                        self.menu_selected = (self.menu_selected - 1) % len(self.menu_buttons)
+                    elif direction == 1:  # Down
+                        self.menu_selected = (self.menu_selected + 1) % len(self.menu_buttons)
+        
+        elif self.state == "CHARACTER_SELECT":
+            # Determine which player based on joystick_id
+            if joystick_id == 0:  # Player 1
+                if not self.p1_selected:
+                    for axis, direction in results:
+                        if axis == 0:  # Left/Right
+                            if direction == -1:  # Left
+                                self.p1_cursor = (self.p1_cursor - 1) % len(c.CHARACTERS)
+                            elif direction == 1:  # Right
+                                self.p1_cursor = (self.p1_cursor + 1) % len(c.CHARACTERS)
+            elif joystick_id == 1:  # Player 2
+                if not self.p2_selected:
+                    for axis, direction in results:
+                        if axis == 0:  # Left/Right
+                            if direction == -1:  # Left
+                                self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
+                            elif direction == 1:  # Right
+                                self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
+    
+    def _handle_joy_menu(self, button, joystick_id):
+        """Handle joystick input in main menu"""
+        # Hat buttons for navigation
+        if button == 'H0':  # Up
+            self.menu_selected = (self.menu_selected - 1) % len(self.menu_buttons)
+        elif button == 'H2':  # Down
+            self.menu_selected = (self.menu_selected + 1) % len(self.menu_buttons)
+        # Any action button to select
+        elif button in ['0', '1', '9']:  # b, a, or Start
+            self._activate_menu_button(self.menu_selected)
+    
+    def _handle_joy_character_select(self, button, joystick_id):
+        """Handle joystick input in character selection"""
+        # Determine which player based on joystick_id
+        if joystick_id == 0:  # Player 1
+            if not self.p1_selected:
+                if button == 'H3':  # Left
+                    self.p1_cursor = (self.p1_cursor - 1) % len(c.CHARACTERS)
+                elif button == 'H1':  # Right
+                    self.p1_cursor = (self.p1_cursor + 1) % len(c.CHARACTERS)
+                elif button in ['0', '1']:  # b or a to select
+                    self.p1_selected = True
+        elif joystick_id == 1:  # Player 2
+            if not self.p2_selected:
+                if button == 'H3':  # Left
+                    self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
+                elif button == 'H1':  # Right
+                    self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
+                elif button in ['0', '1']:  # b or a to select
+                    self.p2_selected = True
+    
+    def get_joy_action(self, action, joystick_id=0):
+        """
+        Check if a game action is active via joystick.
+        Used by Fighter class for combat input.
+        
+        Args:
+            action: Action name ('light_punch', 'jump', etc.)
+            joystick_id: Which joystick to check (0 for P1, 1 for P2)
+            
+        Returns:
+            True if the action is currently triggered via joystick
+        """
+        if joystick_id not in self.joy_input_state:
+            return False
+        
+        state = self.joy_input_state[joystick_id]
+        
+        # Get button mappings based on player
+        if joystick_id == 0:
+            button_map = c.ARCADE_P1_BUTTONS
+            axis_map = c.ARCADE_P1_AXIS
+        else:
+            button_map = c.ARCADE_P2_BUTTONS
+            axis_map = c.ARCADE_P2_AXIS
+        
+        # Check button actions
+        if action in button_map:
+            button = button_map[action]
+            if button in state['buttons']:
+                return True
+        
+        # Check axis actions (movement)
+        if action in axis_map:
+            axis, direction = axis_map[action]
+            if (axis, direction) in state['axis']:
+                return True
+        
+        # Check hat/dpad buttons
+        for hat_button, hat_action in c.HAT_BUTTONS.items():
+            if hat_action == action and hat_button in state['buttons']:
+                return True
+        
+        return False
     
     # ==================== MAIN MENU STATE ====================
     
@@ -317,72 +524,108 @@ class Game:
             self.state = "MAIN_MENU"
     
     def _draw_controls(self):
-        """Render controls screen"""
-        # Layout constants
-        P1_CONTROLS_X = 120
-        P1_CONTROLS_KEY_X = 350
-        P2_CONTROLS_X = 450
-        P2_CONTROLS_KEY_X = 620
-        
+        """Render controls screen with keyboard and arcade box controls"""
         # Title
         title = self.text_renderer.render("GAME CONTROLS", 'large', c.ORANGE)
         title_x = c.SCREEN_WIDTH // 2 - title.get_width() // 2
-        self.screen.blit(title, (title_x, 50))
+        self.screen.blit(title, (title_x, 30))
         
-        # Controls panel - made taller to fit all text
-        panel_rect = pygame.Rect(100, 120, c.SCREEN_WIDTH - 200, 410)
+        # Controls panel
+        panel_rect = pygame.Rect(20, 80, c.SCREEN_WIDTH - 40, 400)
         pygame.draw.rect(self.screen, c.BLACK, panel_rect)
         pygame.draw.rect(self.screen, c.ORANGE, panel_rect, 3)
         
-        # Player 1 controls
-        y_offset = 140
-        p1_title = self.text_renderer.render("PLAYER 1", 'medium', c.RED)
-        self.screen.blit(p1_title, (P1_CONTROLS_X, y_offset))
+        # ===== KEYBOARD CONTROLS =====
+        kbd_title = self.text_renderer.render("KEYBOARD", 'medium', c.GREEN)
+        self.screen.blit(kbd_title, (40, 90))
         
-        y_offset += 35
+        # Player 1 keyboard
+        y_offset = 115
+        p1_title = self.text_renderer.render("P1:", 'small', c.RED)
+        self.screen.blit(p1_title, (40, y_offset))
+        
+        y_offset += 18
         controls_p1 = [
-            ("MOVE:", "W/A/S/D"),
-            ("LIGHT PUNCH:", "J"),
-            ("HEAVY PUNCH:", "K"),
-            ("LIGHT KICK:", "L"),
-            ("HEAVY KICK:", "I"),
-            ("SPECIAL:", "U"),
-            ("DASH:", "LEFT SHIFT"),
-            ("PARRY:", "O"),
-            ("BLOCK:", "HOLD DOWN (S)"),
+            ("MOVE: W/A/S/D", "PUNCH: J/K"),
+            ("KICK: L/I", "SPECIAL: U"),
+            ("DASH: LSHIFT", "PARRY: O"),
         ]
         
-        for label, key in controls_p1:
-            label_surf = self.text_renderer.render(label, 'small', c.WHITE)
-            key_surf = self.text_renderer.render(key, 'small', c.YELLOW)
-            self.screen.blit(label_surf, (P1_CONTROLS_X, y_offset))
-            self.screen.blit(key_surf, (P1_CONTROLS_KEY_X, y_offset))
-            y_offset += 22
+        for left, right in controls_p1:
+            left_surf = self.text_renderer.render(left, 'small', c.WHITE)
+            right_surf = self.text_renderer.render(right, 'small', c.WHITE)
+            self.screen.blit(left_surf, (40, y_offset))
+            self.screen.blit(right_surf, (200, y_offset))
+            y_offset += 16
         
-        # Player 2 controls
-        y_offset = 140
-        p2_title = self.text_renderer.render("PLAYER 2", 'medium', c.BLUE)
-        self.screen.blit(p2_title, (P2_CONTROLS_X, y_offset))
+        # Player 2 keyboard
+        y_offset += 8
+        p2_title = self.text_renderer.render("P2:", 'small', c.BLUE)
+        self.screen.blit(p2_title, (40, y_offset))
         
-        y_offset += 35
+        y_offset += 18
         controls_p2 = [
-            ("MOVE:", "ARROW KEYS"),
-            ("LIGHT PUNCH:", "NUMPAD 1"),
-            ("HEAVY PUNCH:", "NUMPAD 2"),
-            ("LIGHT KICK:", "NUMPAD 3"),
-            ("HEAVY KICK:", "NUMPAD 4"),
-            ("SPECIAL:", "NUMPAD 0"),
-            ("DASH:", "RIGHT SHIFT"),
-            ("PARRY:", "NUMPAD 5"),
-            ("BLOCK:", "HOLD DOWN ARROW"),
+            ("MOVE: ARROWS", "PUNCH: NUM1/2"),
+            ("KICK: NUM3/4", "SPECIAL: NUM0"),
+            ("DASH: RSHIFT", "PARRY: NUM5"),
         ]
         
-        for label, key in controls_p2:
-            label_surf = self.text_renderer.render(label, 'small', c.WHITE)
-            key_surf = self.text_renderer.render(key, 'small', c.YELLOW)
-            self.screen.blit(label_surf, (P2_CONTROLS_X, y_offset))
-            self.screen.blit(key_surf, (P2_CONTROLS_KEY_X, y_offset))  # Align with label on same line
-            y_offset += 22
+        for left, right in controls_p2:
+            left_surf = self.text_renderer.render(left, 'small', c.WHITE)
+            right_surf = self.text_renderer.render(right, 'small', c.WHITE)
+            self.screen.blit(left_surf, (40, y_offset))
+            self.screen.blit(right_surf, (200, y_offset))
+            y_offset += 16
+        
+        # ===== ARCADE BOX CONTROLS =====
+        arcade_title = self.text_renderer.render("ARCADE BOX", 'medium', c.GREEN)
+        self.screen.blit(arcade_title, (420, 90))
+        
+        y_offset = 115
+        arcade_info = [
+            ("JOYSTICK: MOVE", ""),
+            ("B BUTTON: LIGHT PUNCH", ""),
+            ("A BUTTON: HEAVY PUNCH", ""),
+            ("X BUTTON: LIGHT KICK", ""),
+            ("Y BUTTON: HEAVY KICK", ""),
+            ("INSERT: SPECIAL MOVE", ""),
+            ("SELECT: DASH", ""),
+            ("START: PARRY", ""),
+            ("", ""),
+            ("P1 BUTTON: EXIT GAME", "(RESET)"),
+        ]
+        
+        for label, note in arcade_info:
+            if label:
+                label_surf = self.text_renderer.render(label, 'small', c.WHITE)
+                self.screen.blit(label_surf, (420, y_offset))
+            if note:
+                note_surf = self.text_renderer.render(note, 'small', c.RED)
+                self.screen.blit(note_surf, (620, y_offset))
+            y_offset += 16
+        
+        # ===== GENERAL INFO =====
+        info_y = 340
+        pygame.draw.line(self.screen, c.ORANGE, (30, info_y), (c.SCREEN_WIDTH - 30, info_y), 2)
+        
+        info_y += 10
+        info_lines = [
+            "BLOCK: HOLD DOWN TO BLOCK ATTACKS",
+            "ESC: RETURN TO MENU / EXIT",
+            "SUPPORTS PS4/PS5 AND SWITCH CONTROLLERS",
+        ]
+        
+        for line in info_lines:
+            info_surf = self.text_renderer.render(line, 'small', c.YELLOW)
+            self.screen.blit(info_surf, (40, info_y))
+            info_y += 18
+        
+        # Joystick status
+        joy_count = joystick.get_joystick_count()
+        status_text = f"JOYSTICKS CONNECTED: {joy_count}"
+        status_color = c.GREEN if joy_count > 0 else c.GRAY
+        status_surf = self.text_renderer.render(status_text, 'small', status_color)
+        self.screen.blit(status_surf, (420, info_y - 18))
         
         # Back button
         self.controls_back_button.draw(self.screen, self.text_renderer)
@@ -539,8 +782,12 @@ class Game:
         
         # Spawn fighters on the ground (FLOOR_Y - P_HEIGHT)
         spawn_y = c.FLOOR_Y - c.P_HEIGHT
-        self.p1 = Fighter(200, spawn_y, stats_p1, controls_p1, is_p2=False, combat_system=self.combat_system, fighter_id="p1")
-        self.p2 = Fighter(550, spawn_y, stats_p2, controls_p2, is_p2=True, combat_system=self.combat_system, fighter_id="p2")
+        self.p1 = Fighter(200, spawn_y, stats_p1, controls_p1, is_p2=False, 
+                         combat_system=self.combat_system, fighter_id="p1",
+                         joy_input_getter=self.get_joy_action)
+        self.p2 = Fighter(550, spawn_y, stats_p2, controls_p2, is_p2=True, 
+                         combat_system=self.combat_system, fighter_id="p2",
+                         joy_input_getter=self.get_joy_action)
         
         # Register fighters with combat system for combo tracking
         self.combat_system.register_fighter("p1")

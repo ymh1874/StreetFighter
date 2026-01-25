@@ -278,7 +278,7 @@ class Attack:
         self.stun = stun 
 
 class Fighter:
-    def __init__(self, x, y, stats, controls, is_p2=False, combat_system=None, fighter_id=None):
+    def __init__(self, x, y, stats, controls, is_p2=False, combat_system=None, fighter_id=None, joy_input_getter=None):
         self.rect = pygame.Rect(x, y, c.P_WIDTH, c.P_HEIGHT)
         self.stats = stats
         self.color = stats['color']
@@ -286,6 +286,7 @@ class Fighter:
         self.is_p2 = is_p2
         self.combat_system = combat_system  # Reference to combat system for combo tracking
         self.fighter_id = fighter_id  # "p1" or "p2" for combo tracking
+        self.joy_input_getter = joy_input_getter  # Function to get joystick input state
         
         # Physics from stats
         self.speed = stats['speed']
@@ -356,6 +357,29 @@ class Fighter:
         
         return FrameData.can_move_during_attack(self.attack_type, frames_elapsed)
     
+    def is_action_pressed(self, action):
+        """
+        Check if an action is currently pressed via keyboard or joystick.
+        
+        Args:
+            action: Action name ('left', 'right', 'jump', 'light_punch', etc.)
+            
+        Returns:
+            True if the action is currently triggered
+        """
+        # Check keyboard
+        key = pygame.key.get_pressed()
+        if action in self.controls and key[self.controls[action]]:
+            return True
+        
+        # Check joystick via the getter function
+        if self.joy_input_getter:
+            joystick_id = 1 if self.is_p2 else 0
+            if self.joy_input_getter(action, joystick_id):
+                return True
+        
+        return False
+    
     def move(self, target, width, height):
         dx = 0
         dy = 0
@@ -374,11 +398,9 @@ class Fighter:
             if self.rect.right > width: self.rect.right = width
             return
 
-        key = pygame.key.get_pressed()
-        
         # Dash handling - now works in mid-air too
         current_time = pygame.time.get_ticks()
-        if key[self.controls.get('dash', pygame.K_LSHIFT)] and not self.dashing and current_time - self.last_dash_time > 500:
+        if self.is_action_pressed('dash') and not self.dashing and current_time - self.last_dash_time > 500:
             self.dashing = True
             self.dash_timer = c.FRAME_DATA['dash']['active']  # 8 frames
             self.last_dash_time = current_time
@@ -397,14 +419,14 @@ class Fighter:
 
         # Input Handling - can move during light attacks (but not during dash)
         if self.can_move() and not self.dashing:
-            if key[self.controls['left']]:
+            if self.is_action_pressed('left'):
                 dx = -self.speed
                 self.facing_right = False
-            if key[self.controls['right']]:
+            if self.is_action_pressed('right'):
                 dx = self.speed
                 self.facing_right = True
             
-            if key[self.controls['jump']] and not self.jumping:
+            if self.is_action_pressed('jump') and not self.jumping:
                 self.vel_y = self.jump_force
                 self.jumping = True
 
@@ -425,7 +447,7 @@ class Fighter:
         # Block handling (hold down to block)
         # Block can only last max duration and effectiveness degrades
         current_time = pygame.time.get_ticks()
-        if key[self.controls['down']] and not self.jumping and not self.attacking:
+        if self.is_action_pressed('down') and not self.jumping and not self.attacking:
             if not self.blocking:
                 # Starting a new block
                 self.blocking = True
@@ -459,18 +481,18 @@ class Fighter:
         if not self.attacking and not self.blocking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
             # PRIORITY: Parry > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
-            if key[self.controls.get('parry', pygame.K_o)]:
+            if self.is_action_pressed('parry'):
                 # Activate parry
                 self.activate_parry()
-            elif key[self.controls['special']]: 
+            elif self.is_action_pressed('special'): 
                 attack_key = 'special'
-            elif key[self.controls.get('heavy_kick', pygame.K_i)]: 
+            elif self.is_action_pressed('heavy_kick'): 
                 attack_key = 'heavy_kick'
-            elif key[self.controls.get('heavy_punch', pygame.K_k)]: 
+            elif self.is_action_pressed('heavy_punch'): 
                 attack_key = 'heavy_punch'
-            elif key[self.controls.get('light_kick', pygame.K_l)]: 
+            elif self.is_action_pressed('light_kick'): 
                 attack_key = 'light_kick'
-            elif key[self.controls.get('light_punch', pygame.K_j)]: 
+            elif self.is_action_pressed('light_punch'): 
                 attack_key = 'light_punch'
 
             if attack_key:

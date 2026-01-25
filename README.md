@@ -30,7 +30,9 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 
 ## 🎮 Controls
 
-### Player 1
+### Keyboard Controls
+
+#### Player 1
 - **Movement:** W/A/S/D
 - **Light Punch:** J
 - **Heavy Punch:** K
@@ -41,7 +43,7 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 - **Block:** Hold S (Down)
 - **Parry:** O
 
-### Player 2
+#### Player 2
 - **Movement:** Arrow Keys
 - **Light Punch:** Numpad 1
 - **Heavy Punch:** Numpad 2
@@ -51,6 +53,26 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 - **Dash:** Right Shift
 - **Block:** Hold Down Arrow
 - **Parry:** Numpad 5
+
+### Arcade Box Controls (CMU Arcade Machine)
+
+| Action | Button |
+|--------|--------|
+| Movement | Joystick |
+| Light Punch | B (Button 0) |
+| Heavy Punch | A (Button 1) |
+| Light Kick | X (Button 2) |
+| Heavy Kick | Y (Button 3) |
+| Special Move | Insert (Button 4) |
+| Dash | Select (Button 8) |
+| Parry | Start (Button 9) |
+| **EXIT/RESET** | **P1 (Button 5)** |
+
+**Note:** The P1 button (Button 5) will immediately exit the game. This is the reset button for the arcade box.
+
+### Controller Support
+
+The game also supports PS4/PS5 and Nintendo Switch controllers via USB or Bluetooth.
 
 ## ⚡ Combat Mechanics
 
