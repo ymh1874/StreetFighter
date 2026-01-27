@@ -5,25 +5,21 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 ## 🎮 Characters
 
 ### Professor Khalid - "The Taekwondo Master"
-- **Appearance:** Orange taekwondo gi, slicked-back black hair, athletic build
 - **Stats:** Health: 110 | Speed: 6 | Jump: -19
 - **Special Move:** Spinning Kick - Multi-hit spinning attack that moves forward
 - **Fighting Style:** Balanced, martial arts focused
 
 ### Professor Eduardo - "The Pizza Master"
-- **Appearance:** Red chef's apron, white chef hat, jolly build
 - **Stats:** Health: 95 | Speed: 5 | Jump: -16
 - **Special Move:** Pizza Throw - Launches 3 pizza slices in rapid succession
 - **Fighting Style:** Projectile-based, ranged attacks
 
 ### Professor Hasan - "The Pyromancer"
-- **Appearance:** Yellow/orange wizard robes, completely bald, mystical
 - **Stats:** Health: 100 | Speed: 5 | Jump: -18
 - **Special Move:** Fireball - Fast sine-wave projectile
 - **Fighting Style:** Magic-based, unpredictable projectiles
 
 ### Professor Hammoud - "The Tech Wizard"
-- **Appearance:** Green lab coat, modern glasses, buzz cut
 - **Stats:** Health: 85 | Speed: 7 | Jump: -20
 - **Special Move:** Circuit Board - Slow but homing projectile
 - **Fighting Style:** Tech-based, strategic
@@ -69,10 +65,6 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 | **EXIT/RESET** | **P1 (Button 5)** |
 
 **Note:** The P1 button (Button 5) will immediately exit the game. This is the reset button for the arcade box.
-
-### Controller Support
-
-The game also supports PS4/PS5 and Nintendo Switch controllers via USB or Bluetooth.
 
 ## ⚡ Combat Mechanics
 
@@ -122,33 +114,6 @@ pip install pygame
 python main.py
 ```
 
-## 🎯 Game Modes
-
-1. **Character Select:** Choose your fighter from 4 unique professors
-2. **Fight:** Engage in intense 1v1 combat
-3. **Victory:** Unique victory poses for each character
-
-## 📁 Project Structure
-
-```
-StreetFighter/
-├── main.py          # Entry point
-├── game.py          # Main game loop and state management
-├── config.py        # Character stats and constants
-├── entities.py      # Fighter, Projectile, and Particle classes
-├── drawing.py       # Character drawing functions (pygame primitives)
-├── combat.py        # Combat system, frame data, combos
-├── ui_components.py # UI elements and text rendering
-└── README.md        # This file
-```
-
-## 🛠️ Technical Details
-
-- **Engine:** Pygame
-- **Resolution:** 800x600 (scaled to fullscreen)
-- **FPS:** 60
-- **Art Style:** Hand-drawn using pygame drawing functions
-- **Combat:** Frame-based with precise timing
 
 ## 🎓 Credits
 
