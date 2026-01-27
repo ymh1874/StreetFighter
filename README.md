@@ -66,55 +66,6 @@ A vintage arcade-style fighting game featuring four unique professor characters,
 
 **Note:** The P1 button (Button 5) will immediately exit the game. This is the reset button for the arcade box.
 
-## ⚡ Combat Mechanics
-
-### Attack Frame Data
-- **Light Attacks:** Fast recovery, can move almost immediately
-- **Heavy Attacks:** Slower recovery, more damage
-- **Special Moves:** 2000ms cooldown, unique per character
-
-### Defense System
-- **Blocking:** Hold down to block attacks. Reduces damage by 75% and knockback by 50%
-- **Parry:** Press parry button for a 6-frame window. Successfully parrying:
-  - Negates all damage
-  - Reflects projectiles back at the attacker
-  - Triggers special visual effect (yellow particles)
-  - Has a 30-frame cooldown between uses
-
-### Combo System
-- Maximum combo: 5 hits
-- Damage scaling on hits 4-5 (80% damage)
-- Combos automatically break after 5 hits
-
-### Projectile Balance
-| Projectile | Speed | Damage | Special Property |
-|-----------|-------|--------|------------------|
-| Hasan's Fireball | Fast (8px/f) | 15 | Sine wave motion |
-| Eduardo's Pizza | Medium (5px/f) | 6 per slice | 3 projectiles |
-| Hammoud's Circuit | Slow (4px/f) | 20 | Homing |
-
-## 🎨 Features
-
-- **Hand-drawn characters** using pygame primitives (no sprites)
-- **Comic book style hit effects** ("POW!", "BOOM!", "WHAM!")
-- **Screen shake** on heavy hits
-- **Segmented health bars** with 10 chunks
-- **Special move cooldowns** (2000ms)
-- **Unique victory poses** for each character
-- **Smooth 60 FPS gameplay**
-- **Vintage arcade aesthetic**
-
-## 🚀 How to Run
-
-```bash
-# Install dependencies
-pip install pygame
-
-# Run the game
-python main.py
-```
-
-
 ## 🎓 Credits
 
 Created for CMU-Q Arena Fighting Game Project
