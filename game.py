@@ -360,12 +360,28 @@ class Game:
         
         # Handle menu/character select navigation
         if self.state == "MAIN_MENU":
-            self._handle_joy_menu(button, joystick_id)
+            # Light kick acts as back in main menu
+            if button == '2':
+                self.running = False
+            else:
+                self._handle_joy_menu(button, joystick_id)
+        elif self.state == "CONTROLS":
+            # Light kick acts as back in controls screen
+            if button == '2':
+                self.state = "MAIN_MENU"
+            elif button in ['0', '1', '9']:
+                self.state = "MAIN_MENU"
+        elif self.state == "ABOUT":
+            # Light kick acts as back in about screen
+            if button == '2':
+                self.state = "MAIN_MENU"
+            elif button in ['0', '1', '9']:
+                self.state = "MAIN_MENU"
         elif self.state == "CHARACTER_SELECT":
             self._handle_joy_character_select(button, joystick_id)
         elif self.state == "GAME_OVER":
             # Any button to continue
-            if button in ['0', '1', '9']:  # b, a, or Start
+            if button in ['0', '1', '9']:
                 self.p1_selected = False
                 self.p2_selected = False
                 self.p1_cursor = 0
@@ -1707,7 +1723,7 @@ class Game:
                 winner_text = f"{self.p2.stats['name']} WINS ROUND {self.current_round}!"
                 color = c.BLUE
             else:
-                winner_text = "DOUBLE K.O.!"
+                winner_text = "DOUBLE K.O!"
                 color = c.YELLOW
             
             text_surf = self.text_renderer.render_outlined(winner_text, 'medium', color, c.BLACK, 3)

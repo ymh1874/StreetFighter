@@ -486,11 +486,9 @@ class Fighter:
         # Enhanced blocking detection: holding BACK relative to opponent (not just down)
         # "Back" means: if facing right, holding left is back; if facing left, holding right is back
         is_holding_back = False
-        # Arcade: allow 'light punch' button to also act as 'back' for blocking
-        light_punch_pressed = self.is_action_pressed('light_punch')
-        if self.facing_right and (self.is_action_pressed('left') or light_punch_pressed):
+        if self.facing_right and self.is_action_pressed('left'):
             is_holding_back = True
-        elif not self.facing_right and (self.is_action_pressed('right') or light_punch_pressed):
+        elif not self.facing_right and self.is_action_pressed('right'):
             is_holding_back = True
         
         # Also treat down as block (original behavior)
