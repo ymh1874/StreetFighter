@@ -1,3 +1,10 @@
-# Requirements for CMUQ Arena
-# For use with the CMU Arcade Box and local development
-pygame
+# Requirements for CMUQ Arena - Arcade Fighting Game
+# For use with the CMU Arcade Box (Ubuntu) and local development
+
+# Core requirement: pygame for graphics and input handling
+# Pinned to 2.5+ for stability and compatibility
+pygame>=2.5.0,<3.0.0
+
+# Optional: cmu-graphics for arcade box integration (as fallback only)
+# If installed, provides pygame compatibility layer
+cmu-graphics>=1.1.0
