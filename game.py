@@ -71,6 +71,10 @@ class Game:
             1: {'buttons': set(), 'axis': set()},  # Player 2 joystick
         }
         
+        # Debouncing for menu/character select joystick scrolling (prevent too-fast scrolling)
+        self.joy_menu_scroll_cooldown = 0
+        self.joy_char_select_cooldown = {0: 0, 1: 0}  # Per-player cooldown
+        
         # Visual effects
         self.scanlines = ScanlineEffect(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
         self.screen_shake = 0
@@ -200,6 +204,13 @@ class Game:
             
             # Update joystick hold states
             joystick.update()
+            
+            # Decrement joystick menu scroll cooldown
+            if self.joy_menu_scroll_cooldown > 0:
+                self.joy_menu_scroll_cooldown -= 1
+            for player_id in self.joy_char_select_cooldown:
+                if self.joy_char_select_cooldown[player_id] > 0:
+                    self.joy_char_select_cooldown[player_id] -= 1
             
             # ===== STATE-BASED UPDATE AND RENDERING =====
             if self.state == "MAIN_MENU":
@@ -366,37 +377,55 @@ class Game:
             results: List of (axis, direction) tuples for active movements
             joystick_id: ID of the joystick
         """
-        # Update tracked state
+        # Update tracked state - ALWAYS update to current active movements
+        # Empty list means all axes are at neutral
         if joystick_id in self.joy_input_state:
-            self.joy_input_state[joystick_id]['axis'] = set(results)
+            # Convert results to set - this ensures released axes are removed
+            new_axis_state = set(results) if results else set()
+            old_axis_state = self.joy_input_state[joystick_id]['axis']
+            
+            # Update the state
+            self.joy_input_state[joystick_id]['axis'] = new_axis_state
+            
+            # Debug: Log axis state changes
+            if new_axis_state != old_axis_state:
+                print(f"[Joy {joystick_id}] Axis changed: {old_axis_state} -> {new_axis_state} (results={results})")
         
-        # Handle menu/character select navigation
+        # Handle menu/character select navigation WITH DEBOUNCING
+        # Only process menu scrolling every 8 frames to prevent too-fast scrolling
         if self.state == "MAIN_MENU":
-            for axis, direction in results:
-                if axis == 1:  # Up/Down
-                    if direction == -1:  # Up
-                        self.menu_selected = (self.menu_selected - 1) % len(self.menu_buttons)
-                    elif direction == 1:  # Down
-                        self.menu_selected = (self.menu_selected + 1) % len(self.menu_buttons)
+            if self.joy_menu_scroll_cooldown <= 0 and results:
+                for axis, direction in results:
+                    if axis == 1:  # Up/Down
+                        if direction == -1:  # Up
+                            self.menu_selected = (self.menu_selected - 1) % len(self.menu_buttons)
+                            self.joy_menu_scroll_cooldown = 8  # 8 frame cooldown
+                        elif direction == 1:  # Down
+                            self.menu_selected = (self.menu_selected + 1) % len(self.menu_buttons)
+                            self.joy_menu_scroll_cooldown = 8  # 8 frame cooldown
         
         elif self.state == "CHARACTER_SELECT":
             # Determine which player based on joystick_id
-            if joystick_id == 0:  # Player 1
-                if not self.p1_selected:
+            if joystick_id == 0 and self.joy_char_select_cooldown[0] <= 0:  # Player 1
+                if not self.p1_selected and results:
                     for axis, direction in results:
                         if axis == 0:  # Left/Right
                             if direction == -1:  # Left
                                 self.p1_cursor = (self.p1_cursor - 1) % len(c.CHARACTERS)
+                                self.joy_char_select_cooldown[0] = 8
                             elif direction == 1:  # Right
                                 self.p1_cursor = (self.p1_cursor + 1) % len(c.CHARACTERS)
-            elif joystick_id == 1:  # Player 2
-                if not self.p2_selected:
+                                self.joy_char_select_cooldown[0] = 8
+            elif joystick_id == 1 and self.joy_char_select_cooldown[1] <= 0:  # Player 2
+                if not self.p2_selected and results:
                     for axis, direction in results:
                         if axis == 0:  # Left/Right
                             if direction == -1:  # Left
                                 self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
+                                self.joy_char_select_cooldown[1] = 8
                             elif direction == 1:  # Right
                                 self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
+                                self.joy_char_select_cooldown[1] = 8
     
     def _handle_joy_menu(self, button, joystick_id):
         """Handle joystick input in main menu"""

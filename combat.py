@@ -251,13 +251,21 @@ class FrameData:
         
         data = c.FRAME_DATA[attack_type]
         
+        # For arcade machines, allow movement during startup frames even for heavy attacks
+        # This makes simultaneous input feel more responsive
+        startup_frames = data['startup']
+        if frames_elapsed < startup_frames:
+            return True  # Always allow movement during startup
+        
         # Light attacks can move after active frames
         if data.get('can_move_early', False):
-            active_end = data['startup'] + data['active']
+            active_end = startup_frames + data['active']
             return frames_elapsed >= active_end
         
-        # Heavy attacks must complete full recovery
-        return frames_elapsed >= data['total']
+        # Heavy attacks: allow movement after active frames
+        # (was: require full recovery, now: allow after active)
+        active_end = startup_frames + data['active']
+        return frames_elapsed >= active_end
     
     @staticmethod
     def get_attack_duration(attack_type):
