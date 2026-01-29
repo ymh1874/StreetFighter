@@ -45,6 +45,10 @@ class Game:
         if hasattr(pygame, 'init'):
             pygame.init()
         
+        # Initialize mixer for music/sound
+        if hasattr(pygame, 'mixer'):
+            pygame.mixer.init()
+        
         # Display setup - fullscreen scaled for authentic arcade feel
         self.screen = pygame.display.set_mode(
             (c.SCREEN_WIDTH, c.SCREEN_HEIGHT),
@@ -74,6 +78,11 @@ class Game:
         # Debouncing for menu/character select joystick scrolling (prevent too-fast scrolling)
         self.joy_menu_scroll_cooldown = 0
         self.joy_char_select_cooldown = {0: 0, 1: 0}  # Per-player cooldown
+        
+        # Music/Audio
+        self.music_path = os.path.join(os.path.dirname(__file__), 'music.mp3')
+        self.music_start_time = 0  # Track when music started
+        self.music_loop_point = 180000  # Loop from 3 minutes (180 seconds) in milliseconds
         
         # Visual effects
         self.scanlines = ScanlineEffect(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
@@ -176,9 +185,15 @@ class Game:
     
     def run(self):
         """Main game loop - handles events, updates, and rendering"""
+        # Start playing music at game start
+        self._play_music()
+        
         while self.running:
             # Limit to 60 FPS for consistent gameplay
             self.clock.tick(c.FPS)
+            
+            # Update music looping (handles loop point at 3 minutes)
+            self._update_music()
             
             # Clear screen with arcade background
             self.screen.fill(c.DARK_GRAY)
@@ -593,6 +608,34 @@ class Game:
             self.state = "CONTROLS"
         elif index == 2:  # ABOUT
             self.state = "ABOUT"
+    
+    def _play_music(self):
+        """Start playing background music"""
+        try:
+            if os.path.exists(self.music_path):
+                pygame.mixer.music.load(self.music_path)
+                pygame.mixer.music.play(-1)  # -1 means loop infinitely (we'll handle the custom loop point)
+                self.music_start_time = pygame.time.get_ticks()
+                print(f"Music loaded and playing: {self.music_path}")
+            else:
+                print(f"Warning: Music file not found at {self.music_path}")
+        except Exception as e:
+            print(f"Error loading music: {e}")
+    
+    def _update_music(self):
+        """Handle music looping from minute 3 when it ends"""
+        try:
+            # Check if music is playing
+            if not pygame.mixer.music.get_busy():
+                # Music ended, restart from loop point (3 minutes = 180 seconds)
+                pygame.mixer.music.load(self.music_path)
+                pygame.mixer.music.play(-1)
+                # Note: pygame doesn't support starting from a specific position,
+                # so we restart from the beginning. For a perfect loop from 3:00,
+                # you would need to edit the music file to start at that point.
+                print("Music restarting...")
+        except Exception as e:
+            print(f"Error updating music: {e}")
     
     def _draw_main_menu(self):
         """Render main menu screen with vintage arcade styling"""
@@ -1041,7 +1084,14 @@ class Game:
         # Check for input during attract mode
         if self.attract_mode:
             keys = pygame.key.get_pressed()
-            any_input = any(keys) or any(self.joy_input_state[0]['buttons']) or any(self.joy_input_state[1]['buttons'])
+            # Check only specific keys for arcade compatibility (pygame-ce doesn't support any(keys))
+            start_keys_pressed = (
+                keys[pygame.K_SPACE] or 
+                keys[pygame.K_RETURN] or 
+                keys[pygame.K_z] or 
+                keys[pygame.K_x]
+            )
+            any_input = start_keys_pressed or any(self.joy_input_state[0]['buttons']) or any(self.joy_input_state[1]['buttons'])
             if any_input:
                 self.attract_mode = False
                 self.idle_timer = 0

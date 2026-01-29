@@ -534,11 +534,9 @@ class Fighter:
         if not self.attacking and not self.blocking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
             
-            # Check for ULTIMATE: Super meter full + special input + down + forward held
-            if self.super_meter >= c.SUPER_METER_MAX:
-                # Check for motion input: quarter circle forward + heavy punch
-                if self._check_motion_input('quarter_circle_forward') and self.is_action_pressed('heavy_punch'):
-                    attack_key = 'ultimate'
+            # Check for ULTIMATE: Super meter full + special button pressed
+            if self.super_meter >= c.SUPER_METER_MAX and self.is_action_pressed('special'):
+                attack_key = 'ultimate'
             
             # PRIORITY: Ultimate > Parry > Motion Special > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
             if attack_key is None:
