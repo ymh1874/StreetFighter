@@ -1,13 +1,121 @@
 """
 Pygame compatibility layer for CMU Arcade Box
 
+This module handles the case where a fake/shim pygame (from cmu_graphics)
+shadows the real pygame. It detects, purges, and reloads the real pygame.
+
 Usage: from pygame_compat import pygame
 """
 
-import pygame
+import sys
+import os
+
+def _debug_log(msg):
+    """Print debug info - helps diagnose issues on arcade machine"""
+    print(f"[pygame_compat] {msg}")
+
+def load_robust_pygame():
+    """
+    Attempts to import the REAL pygame.
+    If a shim/wrapper (like cmu_graphics) is detected, it purges it 
+    from sys.modules and sys.path, then retries.
+    """
+    
+    _debug_log(f"Python executable: {sys.executable}")
+    _debug_log(f"Python version: {sys.version}")
+    
+    # 1. First, check if there's a local pygame.py file shadowing the real one
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    local_pygame_file = os.path.join(script_dir, 'pygame.py')
+    local_pygame_folder = os.path.join(script_dir, 'pygame')
+    
+    if os.path.exists(local_pygame_file):
+        _debug_log(f"WARNING: Found local pygame.py at {local_pygame_file} - this may shadow real pygame!")
+    if os.path.exists(local_pygame_folder):
+        _debug_log(f"WARNING: Found local pygame/ folder at {local_pygame_folder} - this may shadow real pygame!")
+    
+    # 2. Clean sys.path BEFORE first import - remove cmu_graphics paths
+    bad_paths = []
+    for p in sys.path[:]:  # Iterate copy
+        if 'cmu_graphics' in p or 'cmu-graphics' in p:
+            bad_paths.append(p)
+            sys.path.remove(p)
+    
+    if bad_paths:
+        _debug_log(f"Removed bad paths: {bad_paths}")
+    
+    # 3. Clear any cached pygame imports (but preserve our own module)
+    pygame_modules = [key for key in list(sys.modules.keys()) 
+                      if 'pygame' in key.lower() and key != 'pygame_compat']
+    for mod in pygame_modules:
+        _debug_log(f"Removing cached module: {mod}")
+        del sys.modules[mod]
+    
+    # 4. Try standard import
+    pygame = None
+    try:
+        import pygame as _pygame
+        pygame = _pygame
+        _debug_log(f"Imported pygame from: {getattr(pygame, '__file__', 'unknown')}")
+        _debug_log(f"Pygame version: {getattr(pygame, '__version__', 'unknown')}")
+    except ImportError as e:
+        _debug_log(f"First import failed: {e}")
+        pygame = None
+
+    # 5. Check if this is the "Imposter" Pygame
+    if pygame and (not hasattr(pygame, 'init') or not hasattr(pygame, 'display')):
+        _debug_log("WARNING: 'Imposter' pygame detected (missing init/display). Purging...")
+        
+        bad_file = getattr(pygame, '__file__', '')
+        bad_path = os.path.dirname(bad_file) if bad_file else ''
+        _debug_log(f"Bad pygame location: {bad_file}")
+        
+        # Remove the bad module from memory (except our own)
+        pygame_modules = [key for key in list(sys.modules.keys()) 
+                          if 'pygame' in key.lower() and key != 'pygame_compat']
+        for mod in pygame_modules:
+            del sys.modules[mod]
+        
+        # Remove the bad path from sys.path
+        if bad_path and bad_path in sys.path:
+            sys.path.remove(bad_path)
+        
+        # Force re-import
+        pygame = None
+        try:
+            import pygame as _pygame
+            pygame = _pygame
+            _debug_log(f"Re-imported pygame from: {getattr(pygame, '__file__', 'unknown')}")
+        except ImportError as e:
+            _debug_log(f"Re-import failed: {e}")
+
+    # 6. Final verification
+    if pygame is None or not hasattr(pygame, 'init'):
+        _debug_log("ERROR: Could not load valid pygame!")
+        _debug_log(f"Pygame object: {pygame}")
+        _debug_log(f"Has init: {hasattr(pygame, 'init') if pygame else False}")
+        _debug_log(f"Has display: {hasattr(pygame, 'display') if pygame else False}")
+        _debug_log("--- SYS.PATH ---")
+        for p in sys.path:
+            _debug_log(f"  {p}")
+        
+        raise ImportError(
+            f"Failed to load valid pygame. "
+            f"Loaded module: {pygame}. "
+            f"File: {getattr(pygame, '__file__', 'unknown') if pygame else 'None'}. "
+            "Ensure pygame is installed: pip install pygame"
+        )
+    
+    _debug_log(f"SUCCESS: Valid pygame loaded with init() and display")
+    return pygame
+
+
+# Load the verified pygame
+pygame = load_robust_pygame()
 
 # Initialize pygame
 pygame.init()
+_debug_log("pygame.init() called successfully")
 
 # ============================================================
 # KEY CONSTANT FALLBACKS
