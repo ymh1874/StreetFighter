@@ -205,6 +205,22 @@ class Game:
             # Update joystick hold states
             joystick.update()
             
+            # CRITICAL FIX: Clean up stale axis states
+            # This is a safety check for arcade joysticks that might not send proper release events
+            for joystick_id in list(self.joy_input_state.keys()):
+                if joystick_id < pygame.joystick.get_count():
+                    joy = pygame.joystick.Joystick(joystick_id)
+                    # Check axis 0 (left/right)
+                    axis0_val = joy.get_axis(0) if joy.get_numaxes() > 0 else 0
+                    # Check axis 1 (up/down)
+                    axis1_val = joy.get_axis(1) if joy.get_numaxes() > 1 else 0
+                    
+                    # If both axes are near center, clear axis state
+                    if abs(axis0_val) < 0.3 and abs(axis1_val) < 0.3:
+                        if self.joy_input_state[joystick_id]['axis']:
+                            print(f"[CLEANUP] Joy {joystick_id} axes cleared (were: {self.joy_input_state[joystick_id]['axis']})")
+                            self.joy_input_state[joystick_id]['axis'].clear()
+            
             # Decrement joystick menu scroll cooldown
             if self.joy_menu_scroll_cooldown > 0:
                 self.joy_menu_scroll_cooldown -= 1
@@ -492,8 +508,15 @@ class Game:
         # Check axis actions (movement)
         if action in axis_map:
             axis, direction = axis_map[action]
-            if (axis, direction) in state['axis']:
-                return True
+            axis_tuple = (axis, direction)
+            in_axis_state = axis_tuple in state['axis']
+            
+            # Debug: log movement checks
+            if action in ['left', 'right', 'jump', 'down']:
+                if in_axis_state or (self.state == "FIGHT" and action in ['left', 'right']):
+                    print(f"[Joy {joystick_id}] Check {action}: axis_tuple={axis_tuple}, in_state={in_axis_state}, state['axis']={state['axis']}")
+            
+            return in_axis_state
         
         # Check hat/dpad buttons
         for hat_button, hat_action in c.HAT_BUTTONS.items():
