@@ -41,7 +41,9 @@ class Game:
     
     def __init__(self):
         """Initialize game window, assets, and game state"""
-        pygame.init()
+        # Safe init for arcade box compatibility
+        if hasattr(pygame, 'init'):
+            pygame.init()
         
         # Display setup - fullscreen scaled for authentic arcade feel
         self.screen = pygame.display.set_mode(

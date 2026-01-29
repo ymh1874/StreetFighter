@@ -29,19 +29,18 @@ if pygame is None:
         )
 
 # Ensure pygame is initialized for key constants to be available
-# Use try/except for arcade box compatibility (some pygame builds lack get_init)
-try:
-    if hasattr(pygame, 'get_init') and not pygame.get_init():
-        pygame.init()
-    elif not hasattr(pygame, 'get_init'):
-        # Arcade box pygame - just call init (it's safe to call multiple times)
-        pygame.init()
-except Exception:
-    # If anything fails, try to initialize anyway
+# Use try/except for arcade box compatibility (some pygame builds lack init/get_init)
+if hasattr(pygame, 'init'):
     try:
-        pygame.init()
+        if hasattr(pygame, 'get_init'):
+            if not pygame.get_init():
+                pygame.init()
+        else:
+            # No get_init, just try to init
+            pygame.init()
     except Exception:
-        pass  # Already initialized or not needed
+        pass  # Already initialized or not available
+# If pygame has no init(), it's likely a loader module that's already initialized
 
 # ============================================================
 # KEY CONSTANT FALLBACKS
