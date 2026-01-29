@@ -8,34 +8,51 @@ This module provides a unified way to import pygame that works both:
 Usage: Instead of `import pygame`, use:
     from pygame_compat import pygame
 
-The arcade box has pygame installed system-wide, so we try that first.
+IMPORTANT: This game requires the REAL pygame module with display, init, etc.
+The cmu_graphics.libs.pygame_loader is NOT sufficient.
 """
 
-# Try multiple import paths for pygame compatibility
+import sys
+
+# Remove any fake pygame from cmu_graphics that might shadow the real one
+# This ensures we get the actual pygame package
+modules_to_remove = [key for key in sys.modules.keys() 
+                     if 'cmu_graphics' in key and 'pygame' in key]
+for mod in modules_to_remove:
+    del sys.modules[mod]
+
+# Also remove pygame if it was imported from cmu_graphics
+if 'pygame' in sys.modules:
+    _existing = sys.modules['pygame']
+    # Check if it's the fake one (doesn't have display)
+    if not hasattr(_existing, 'display'):
+        del sys.modules['pygame']
+
 pygame = None
 
-# FIRST: Try standard pygame (works on arcade box Ubuntu and regular systems)
+# Try to import the REAL pygame
 try:
     import pygame as _pygame
-    pygame = _pygame
+    # Verify it's the real pygame with display module
+    if hasattr(_pygame, 'display') and hasattr(_pygame, 'init'):
+        pygame = _pygame
+    else:
+        # It's a fake/wrapper pygame, reject it
+        pygame = None
+        del sys.modules['pygame']
 except ImportError:
     pass
 
-# SECOND: If standard pygame failed, try cmu_graphics bundled pygame
-if pygame is None:
-    try:
-        from cmu_graphics.libs import pygame_loader as _pg_loader
-        # Check if it's actually usable (has display, etc.)
-        if hasattr(_pg_loader, 'display'):
-            pygame = _pg_loader
-    except ImportError:
-        pass
-
-# THIRD: If still nothing, raise an error
+# If we still don't have pygame, raise an error with helpful message
 if pygame is None:
     raise ImportError(
-        "Could not import pygame. Please install it with: pip install pygame\n"
-        "On Ubuntu/arcade box: sudo apt-get install python3-pygame"
+        "Could not import the real pygame module.\n"
+        "This game requires pygame with display support.\n"
+        "Install with: pip install pygame>=2.5.0\n"
+        "On Ubuntu: sudo apt-get install python3-pygame\n"
+        "\n"
+        "If cmu-graphics is installed, it may be conflicting.\n"
+        "Try: pip uninstall cmu-graphics && pip install pygame"
     )
 
 # Ensure pygame is initialized for key constants to be available
