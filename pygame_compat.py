@@ -1,116 +1,13 @@
 """
 Pygame compatibility layer for CMU Arcade Box
 
-This module provides a unified way to import pygame that works both:
-1. On regular systems with standard pygame
-2. On the CMU arcade box (Ubuntu) with cmu_graphics bundled pygame
-
-Usage: Instead of `import pygame`, use:
-    from pygame_compat import pygame
+Usage: from pygame_compat import pygame
 """
 
-import sys
-import os
+import pygame
 
-pygame = None
-
-# ============================================================
-# STRATEGY 1: Try standard pygame import first
-# ============================================================
-try:
-    import pygame as _pygame
-    if hasattr(_pygame, 'display') and hasattr(_pygame, 'init'):
-        pygame = _pygame
-except ImportError:
-    pass
-
-# ============================================================
-# STRATEGY 2: Try to get pygame from cmu_graphics installation
-# cmu_graphics installs pygame as a dependency in its libs folder
-# ============================================================
-if pygame is None:
-    try:
-        # cmu_graphics bundles pygame - we need to find it
-        import cmu_graphics
-        cmu_path = os.path.dirname(cmu_graphics.__file__)
-        libs_path = os.path.join(cmu_path, 'libs')
-        
-        # Add the libs path to sys.path temporarily
-        if libs_path not in sys.path:
-            sys.path.insert(0, libs_path)
-        
-        # Try to find pygame in cmu_graphics libs
-        for item in os.listdir(libs_path):
-            if item.startswith('pygame'):
-                pygame_path = os.path.join(libs_path, item)
-                if pygame_path not in sys.path:
-                    sys.path.insert(0, pygame_path)
-        
-        # Now try importing pygame again
-        if 'pygame' in sys.modules:
-            del sys.modules['pygame']
-        
-        import pygame as _pygame
-        if hasattr(_pygame, 'display') and hasattr(_pygame, 'init'):
-            pygame = _pygame
-    except Exception:
-        pass
-
-# ============================================================
-# STRATEGY 3: Use pygame_loader and extract the real pygame
-# ============================================================
-if pygame is None:
-    try:
-        from cmu_graphics.libs import pygame_loader
-        # pygame_loader might have loaded the real pygame
-        if 'pygame' in sys.modules:
-            _pygame = sys.modules['pygame']
-            if hasattr(_pygame, 'display') and hasattr(_pygame, 'init'):
-                pygame = _pygame
-    except Exception:
-        pass
-
-# ============================================================
-# STRATEGY 4: Direct pip-installed pygame (try forcing reimport)
-# ============================================================
-if pygame is None:
-    try:
-        # Clear any cached imports
-        to_remove = [k for k in sys.modules.keys() if 'pygame' in k.lower()]
-        for k in to_remove:
-            del sys.modules[k]
-        
-        import pygame as _pygame
-        pygame = _pygame
-    except ImportError:
-        pass
-
-# ============================================================
-# FINAL CHECK: Just use whatever we got, even if partial
-# ============================================================
-if pygame is None:
-    # Last resort - try pygame_loader directly as our pygame
-    try:
-        from cmu_graphics.libs import pygame_loader as pygame
-    except ImportError:
-        raise ImportError(
-            "Could not import pygame.\n"
-            "Install with: pip install pygame>=2.5.0"
-        )
-
-# Ensure pygame is initialized for key constants to be available
-# Use try/except for arcade box compatibility (some pygame builds lack init/get_init)
-if hasattr(pygame, 'init'):
-    try:
-        if hasattr(pygame, 'get_init'):
-            if not pygame.get_init():
-                pygame.init()
-        else:
-            # No get_init, just try to init
-            pygame.init()
-    except Exception:
-        pass  # Already initialized or not available
-# If pygame has no init(), it's likely a loader module that's already initialized
+# Initialize pygame
+pygame.init()
 
 # ============================================================
 # KEY CONSTANT FALLBACKS
