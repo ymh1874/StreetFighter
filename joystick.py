@@ -43,8 +43,19 @@ _on_joy_axis_callback = None
 
 def init():
     """Initialize the joystick subsystem. Call this after pygame.init()"""
-    if not pygame.joystick.get_init():
-        pygame.joystick.init()
+    # Use try/except for arcade box compatibility (some pygame builds lack get_init)
+    try:
+        if hasattr(pygame.joystick, 'get_init'):
+            if not pygame.joystick.get_init():
+                pygame.joystick.init()
+        else:
+            # Arcade box pygame - just call init
+            pygame.joystick.init()
+    except Exception:
+        try:
+            pygame.joystick.init()
+        except Exception:
+            pass  # Already initialized or not available
     
     # Initialize all connected joysticks
     for i in range(pygame.joystick.get_count()):
