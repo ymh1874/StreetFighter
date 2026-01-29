@@ -3,30 +3,40 @@ Pygame compatibility layer for CMU Arcade Box
 
 This module provides a unified way to import pygame that works both:
 1. On regular systems with standard pygame
-2. On the CMU arcade box with cmu_graphics' bundled pygame
+2. On the CMU arcade box (Ubuntu) with system pygame
 
 Usage: Instead of `import pygame`, use:
     from pygame_compat import pygame
+
+The arcade box has pygame installed system-wide, so we try that first.
 """
 
 # Try multiple import paths for pygame compatibility
 pygame = None
 
+# FIRST: Try standard pygame (works on arcade box Ubuntu and regular systems)
 try:
-    # First, try the cmu_graphics bundled pygame (arcade box)
-    from cmu_graphics.libs import pygame_loader as pygame
+    import pygame as _pygame
+    pygame = _pygame
 except ImportError:
     pass
 
+# SECOND: If standard pygame failed, try cmu_graphics bundled pygame
 if pygame is None:
     try:
-        # Fall back to standard pygame
-        import pygame as _pygame
-        pygame = _pygame
+        from cmu_graphics.libs import pygame_loader as _pg_loader
+        # Check if it's actually usable (has display, etc.)
+        if hasattr(_pg_loader, 'display'):
+            pygame = _pg_loader
     except ImportError:
-        raise ImportError(
-            "Could not import pygame. Please install it with: pip install pygame"
-        )
+        pass
+
+# THIRD: If still nothing, raise an error
+if pygame is None:
+    raise ImportError(
+        "Could not import pygame. Please install it with: pip install pygame\n"
+        "On Ubuntu/arcade box: sudo apt-get install python3-pygame"
+    )
 
 # Ensure pygame is initialized for key constants to be available
 # Use try/except for arcade box compatibility (some pygame builds lack init/get_init)
