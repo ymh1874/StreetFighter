@@ -485,7 +485,22 @@ class Game:
         """
         # Track idle time for attract mode
         keys = pygame.key.get_pressed()
-        any_input = mouse_clicked or any(keys) or any(self.joy_input_state[0]['buttons']) or any(self.joy_input_state[1]['buttons'])
+        
+        # Check for start keys instead of any(keys) - pygame-ce doesn't support iterating all keys
+        # Only check the keys that matter: Space, Enter, Z, X (common arcade buttons)
+        start_keys_pressed = (
+            keys[pygame.K_SPACE] or 
+            keys[pygame.K_RETURN] or 
+            keys[pygame.K_z] or 
+            keys[pygame.K_x]
+        )
+        
+        any_input = (
+            mouse_clicked or 
+            start_keys_pressed or 
+            any(self.joy_input_state[0]['buttons']) or 
+            any(self.joy_input_state[1]['buttons'])
+        )
         
         if any_input:
             self.idle_timer = 0
