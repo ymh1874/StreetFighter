@@ -278,7 +278,7 @@ class Game:
                     self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
                 elif key == pygame.K_RIGHT:
                     self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
-                elif key == pygame.K_a:
+                elif key == pygame.K_KP1:
                     self.p2_selected = True
                     
         # Game over screen
