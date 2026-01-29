@@ -1,4 +1,4 @@
-import pygame
+from pygame_compat import pygame
 import math
 import config as c
 from combat import FrameData, CombatSystem, SpecialMoveData
@@ -300,6 +300,7 @@ class Fighter:
         self.jumping = False
         self.facing_right = not is_p2
         self.alive = True
+        self.was_on_ground = True  # Track for dust particles on landing
         
         # Combat State
         self.attacking = False
@@ -328,22 +329,34 @@ class Fighter:
         self.parry_success = False
         self.parry_cooldown = 0
         
-        # Block State
+        # Block State (enhanced with chip damage and block stun)
         self.blocking = False
+        self.is_blocking = False  # True when actively blocking an attack (holding back)
         self.block_start_time = 0  # Track when block started
         self.block_usage_count = 0  # Track how many times block has been used in current session
         self.block_damage_reduction = 1.0  # Start at 100% reduction (1.0 = block all damage)
+        self.block_stun = 0  # Frames of block stun remaining
+        
+        # Super Meter (0-100)
+        self.super_meter = 0
+        self.ultimate_active = False
+        
+        # Input Buffer for motion inputs
+        self.input_buffer = []  # Rolling buffer of (direction, timestamp) tuples
+        self.last_direction = None  # Track current direction for motion detection
         
         # Attack history for combos
         self.attack_history = []
 
-        # Attack Definitions
+        # Attack Definitions (apply global damage scaling)
+        base_mult = self.dmg_mult * c.GLOBAL_DAMAGE_MULT
         self.moves = {
-            'light_punch': Attack('Light Punch', 5 * self.dmg_mult, 300, 60, 20, 5, 10),
-            'heavy_punch': Attack('Heavy Punch', 12 * self.dmg_mult, 700, 70, 40, 15, 20),
-            'light_kick': Attack('Light Kick', 8 * self.dmg_mult, 500, 80, 30, 10, 15),
-            'heavy_kick': Attack('Heavy Kick', 15 * self.dmg_mult, 900, 90, 40, 20, 25),
-            'special': Attack('Special', 20 * self.dmg_mult, 2000, 120, 60, 25, 30)
+            'light_punch': Attack('Light Punch', 5 * base_mult, 300, 60, 20, 5, 10),
+            'heavy_punch': Attack('Heavy Punch', 12 * base_mult, 700, 70, 40, 15, 20),
+            'light_kick': Attack('Light Kick', 8 * base_mult, 500, 80, 30, 10, 15),
+            'heavy_kick': Attack('Heavy Kick', 15 * base_mult, 900, 90, 40, 20, 25),
+            'special': Attack('Special', 20 * base_mult, 2000, 120, 60, 25, 30),
+            'ultimate': Attack('Ultimate', c.ULTIMATE_DAMAGE * c.GLOBAL_DAMAGE_MULT, 5000, 200, 100, 50, 40)
         }
 
     def can_move(self):
@@ -397,6 +410,19 @@ class Fighter:
             if self.rect.left < 0: self.rect.left = 0
             if self.rect.right > width: self.rect.right = width
             return
+        
+        # Block stun - can't act during block stun
+        if self.block_stun > 0:
+            self.block_stun -= 1
+            self.animation_state = 'block'
+            # Apply gravity even during block stun
+            self.vel_y += c.GRAVITY
+            dy += self.vel_y
+            if self.rect.bottom + dy > c.FLOOR_Y:
+                dy = c.FLOOR_Y - self.rect.bottom
+                self.vel_y = 0
+            self.rect.y += dy
+            return
 
         # Dash handling - now works in mid-air too
         current_time = pygame.time.get_ticks()
@@ -416,6 +442,15 @@ class Fighter:
                 # Fast movement during dash
                 dash_speed = self.speed * 2.5
                 dx = dash_speed if self.facing_right else -dash_speed
+
+        # Record directional input for motion detection
+        current_direction = self._get_current_direction(target)
+        if current_direction and current_direction != self.last_direction:
+            self.input_buffer.append((current_direction, current_time))
+            self.last_direction = current_direction
+            # Keep buffer limited
+            if len(self.input_buffer) > c.INPUT_BUFFER_FRAMES:
+                self.input_buffer.pop(0)
 
         # Input Handling - can move during light attacks (but not during dash)
         if self.can_move() and not self.dashing:
@@ -444,10 +479,23 @@ class Fighter:
         if self.rect.left + dx < 0: dx = -self.rect.left
         if self.rect.right + dx > width: dx = width - self.rect.right
 
-        # Block handling (hold down to block)
-        # Block can only last max duration and effectiveness degrades
+        # Enhanced blocking detection: holding BACK relative to opponent (not just down)
+        # "Back" means: if facing right, holding left is back; if facing left, holding right is back
+        is_holding_back = False
+        if self.facing_right and self.is_action_pressed('left'):
+            is_holding_back = True
+        elif not self.facing_right and self.is_action_pressed('right'):
+            is_holding_back = True
+        
+        # Also treat down as block (original behavior)
+        is_holding_down = self.is_action_pressed('down')
+        
+        # Set is_blocking for combat system to detect
+        self.is_blocking = (is_holding_back or is_holding_down) and not self.jumping and not self.attacking
+        
+        # Block handling (hold back or down to block)
         current_time = pygame.time.get_ticks()
-        if self.is_action_pressed('down') and not self.jumping and not self.attacking:
+        if self.is_blocking:
             if not self.blocking:
                 # Starting a new block
                 self.blocking = True
@@ -460,6 +508,7 @@ class Fighter:
                 # Already blocking - check if max duration has passed
                 if current_time - self.block_start_time > c.BLOCK_DURATION_MS:
                     self.blocking = False
+                    self.is_blocking = False
                     self.animation_state = 'idle'
                     self.block_usage_count += 1
         else:
@@ -480,20 +529,31 @@ class Fighter:
         current_time = pygame.time.get_ticks()
         if not self.attacking and not self.blocking and current_time - self.last_attack_time > self.attack_cooldown:
             attack_key = None
-            # PRIORITY: Parry > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
-            if self.is_action_pressed('parry'):
-                # Activate parry
-                self.activate_parry()
-            elif self.is_action_pressed('special'): 
-                attack_key = 'special'
-            elif self.is_action_pressed('heavy_kick'): 
-                attack_key = 'heavy_kick'
-            elif self.is_action_pressed('heavy_punch'): 
-                attack_key = 'heavy_punch'
-            elif self.is_action_pressed('light_kick'): 
-                attack_key = 'light_kick'
-            elif self.is_action_pressed('light_punch'): 
-                attack_key = 'light_punch'
+            
+            # Check for ULTIMATE: Super meter full + special input + down + forward held
+            if self.super_meter >= c.SUPER_METER_MAX:
+                # Check for motion input: quarter circle forward + heavy punch
+                if self._check_motion_input('quarter_circle_forward') and self.is_action_pressed('heavy_punch'):
+                    attack_key = 'ultimate'
+            
+            # PRIORITY: Ultimate > Parry > Motion Special > Special > Heavy Kick > Heavy Punch > Light Kick > Light Punch
+            if attack_key is None:
+                if self.is_action_pressed('parry'):
+                    # Activate parry
+                    self.activate_parry()
+                # Check for hadouken-style motion input + punch = special
+                elif self._check_motion_input('quarter_circle_forward') and (self.is_action_pressed('light_punch') or self.is_action_pressed('heavy_punch')):
+                    attack_key = 'special'
+                elif self.is_action_pressed('special'): 
+                    attack_key = 'special'
+                elif self.is_action_pressed('heavy_kick'): 
+                    attack_key = 'heavy_kick'
+                elif self.is_action_pressed('heavy_punch'): 
+                    attack_key = 'heavy_punch'
+                elif self.is_action_pressed('light_kick'): 
+                    attack_key = 'light_kick'
+                elif self.is_action_pressed('light_punch'): 
+                    attack_key = 'light_punch'
 
             if attack_key:
                 return_val = self.attack(target, attack_key)
@@ -521,6 +581,16 @@ class Fighter:
         if len(self.attack_history) > 10:
             self.attack_history.pop(0)
         
+        # Handle ultimate move
+        if type_key == 'ultimate':
+            if self.super_meter >= c.SUPER_METER_MAX:
+                self.super_meter = 0  # Reset meter
+                self.ultimate_active = True
+                return self.execute_ultimate_move(target)
+            else:
+                self.attacking = False
+                return None
+        
         # Handle special moves separately
         if type_key == 'special':
             current_time = pygame.time.get_ticks()
@@ -542,14 +612,65 @@ class Fighter:
             # Apply combo damage scaling if combat system is available
             damage = move_data.damage
             if self.combat_system and self.fighter_id:
-                # Increment combo first, then get multiplier for this hit
-                self.combat_system.increment_combo(self.fighter_id)
-                combo_multiplier = self.combat_system.get_combo_damage_multiplier(self.fighter_id)
-                damage *= combo_multiplier
+                # Record the hit for combo tracking
+                combo_info = self.combat_system.record_hit(self.fighter_id, damage, self.attack_type)
+                # Apply combo damage multiplier
+                damage *= combo_info['multiplier']
+            
+            # Gain super meter on hit
+            self.gain_super_meter(c.SUPER_GAIN_ON_HIT)
             
             target.take_damage(damage, move_data.knockback, move_data.stun, self.facing_right)
             return True 
         return False
+    
+    def execute_ultimate_move(self, target):
+        """Execute character-specific ultimate move (full super meter)"""
+        special_type = self.stats.get('special', '')
+        direction = 1 if self.facing_right else -1
+        
+        # Create a powerful version of the character's special
+        if special_type == 'spinning_kick':
+            # Super spinning kick - longer duration, more hits
+            return SpinningKickEffect(self, duration=90)
+        
+        elif special_type == 'pizza_throw':
+            # Ultimate pizza barrage - 6 pizzas
+            projectiles = []
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            
+            for i in range(6):
+                vel_x = 7 * direction
+                vel_y = -10 + i * 3
+                pizza = PizzaSlice(start_x, start_y, vel_x, vel_y, self, delay=i * 3)
+                pizza.damage = 12  # More damage
+                projectiles.append(pizza)
+            
+            return projectiles
+        
+        elif special_type == 'fireball':
+            # Ultimate fireball - bigger, more damage
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            fireball = SineWaveFireball(start_x, start_y, direction, self)
+            fireball.damage = 40  # Big damage
+            return fireball
+        
+        elif special_type == 'circuit_board':
+            # Ultimate circuit barrage - 3 homing boards
+            projectiles = []
+            start_x = self.rect.right if self.facing_right else self.rect.left
+            start_y = self.rect.centery
+            
+            for i in range(3):
+                board = HomingCircuitBoard(start_x, start_y - 30 + i * 30, direction, self, target)
+                board.damage = 25
+                projectiles.append(board)
+            
+            return projectiles
+        
+        return None
     
     def execute_special_move(self, target):
         """Execute character-specific special move"""
@@ -589,25 +710,49 @@ class Fighter:
         return None 
 
     def take_damage(self, amount, knockback, stun, attacker_facing_right):
-        # Check if blocking
-        if self.blocking:
-            # Apply damage reduction: 1.0 = 100% blocked (0% damage taken), 0.5 = 50% blocked (50% damage taken), etc.
-            amount *= (1.0 - self.block_damage_reduction)
-            knockback *= 0.5  # Reduce knockback
-            stun = int(stun * 0.3)  # Reduce stun
+        # Check if blocking (using is_blocking for proper back-hold detection)
+        if self.is_blocking or self.blocking:
+            # Chip damage: take a percentage of damage through block
+            chip_damage = amount * c.CHIP_DAMAGE_PERCENT
+            self.health -= chip_damage
+            
+            # Apply block stun (can't act for a few frames)
+            self.block_stun = c.BLOCK_STUN_FRAMES
+            
+            # Pushblock: push defender back
+            direction = 1 if attacker_facing_right else -1
+            self.rect.x += c.PUSHBLOCK_DISTANCE * direction
+            
+            # Keep on screen
+            if self.rect.left < 0:
+                self.rect.left = 0
+            if self.rect.right > c.SCREEN_WIDTH:
+                self.rect.right = c.SCREEN_WIDTH
+            
+            # Gain some super meter when blocking attacks
+            self.gain_super_meter(c.SUPER_GAIN_ON_DAMAGE // 2)
+            
+            self.color_flash = 3  # Brief flash
+            return True  # Return True to indicate block
         
         # Check if parrying (within parry window)
         if self.parrying and self.parry_window > 0:
             # Successful parry! No damage taken
             self.parry_success = True
             self.color_flash = 10  # Longer flash for parry
+            # Gain extra super meter on successful parry
+            self.gain_super_meter(c.SUPER_GAIN_ON_HIT)
             return True  # Return True to indicate parry success
         
         self.health -= amount
         self.hit_stun = stun
         self.attacking = False 
         self.blocking = False  # Stop blocking when hit
+        self.is_blocking = False
         self.color_flash = 5 
+        
+        # Gain super meter when taking damage (comeback mechanic)
+        self.gain_super_meter(c.SUPER_GAIN_ON_DAMAGE)
         
         # Reset this fighter's combo when taking damage
         if self.combat_system and self.fighter_id:
@@ -621,6 +766,67 @@ class Fighter:
             self.alive = False
         
         return False  # Return False to indicate normal damage taken
+    
+    def gain_super_meter(self, amount):
+        """Add to super meter, capped at max"""
+        self.super_meter = min(c.SUPER_METER_MAX, self.super_meter + amount)
+    
+    def _get_current_direction(self, target):
+        """Get current directional input for motion input detection"""
+        holding_down = self.is_action_pressed('down')
+        holding_left = self.is_action_pressed('left')
+        holding_right = self.is_action_pressed('right')
+        
+        # Determine forward/back based on facing direction
+        if self.facing_right:
+            holding_forward = holding_right
+            holding_back = holding_left
+        else:
+            holding_forward = holding_left
+            holding_back = holding_right
+        
+        # Determine compound direction
+        if holding_down and holding_forward:
+            return 'down_forward'
+        elif holding_down and holding_back:
+            return 'down_back'
+        elif holding_down:
+            return 'down'
+        elif holding_forward:
+            return 'forward'
+        elif holding_back:
+            return 'back'
+        
+        return None
+    
+    def _check_motion_input(self, motion_name):
+        """Check if a motion input pattern was completed recently"""
+        if motion_name not in c.MOTION_INPUTS:
+            return False
+        
+        pattern = c.MOTION_INPUTS[motion_name]
+        current_time = pygame.time.get_ticks()
+        
+        # Filter buffer to recent inputs only
+        recent_inputs = [
+            (direction, timestamp) for direction, timestamp in self.input_buffer
+            if current_time - timestamp < c.MOTION_INPUT_WINDOW * (1000 / 60)  # Convert frames to ms
+        ]
+        
+        if len(recent_inputs) < len(pattern):
+            return False
+        
+        # Check if the pattern matches (in order, allowing gaps)
+        pattern_idx = 0
+        for direction, _ in recent_inputs:
+            if direction == pattern[pattern_idx]:
+                pattern_idx += 1
+                if pattern_idx >= len(pattern):
+                    # Clear the buffer after successful motion
+                    self.input_buffer = []
+                    return True
+        
+        return False
     
     def activate_parry(self):
         """Activate parry with 6-frame window

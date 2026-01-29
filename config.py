@@ -1,4 +1,5 @@
-import pygame
+# Use compatibility layer for arcade machine support
+from pygame_compat import pygame
 
 # --- CONFIGURATION & CONSTANTS ---
 # Internal logic resolution (scales up to fullscreen automatically)
@@ -43,6 +44,9 @@ P_WIDTH = 50
 P_HEIGHT = 100
 
 # Character Definitions
+# Global damage scaling (reduce all damage by this factor for longer fights)
+GLOBAL_DAMAGE_MULT = 0.6  # 60% of original damage
+
 CHARACTERS = [
     {
         'name': 'KHALID', 
@@ -50,7 +54,7 @@ CHARACTERS = [
         'skin': KHALID_SKIN,
         'speed': 6, 
         'jump': -19, 
-        'health': 110, 
+        'health': 300,  # ~3x health for longer fights
         'dmg_mult': 1.0, 
     
         'desc': 'TAEKWONDO MASTER',
@@ -62,7 +66,7 @@ CHARACTERS = [
         'skin': EDUARDO_SKIN,
         'speed': 5, 
         'jump': -16, 
-        'health': 95, 
+        'health': 280,  # ~3x health for longer fights
         'dmg_mult': 0.9, 
         'desc': 'PIZZA MASTER',
         'special': 'pizza_throw'
@@ -73,7 +77,7 @@ CHARACTERS = [
         'skin': HASAN_SKIN,
         'speed': 5, 
         'jump': -18, 
-        'health': 100, 
+        'health': 300,  # ~3x health for longer fights
         'dmg_mult': 1.1, 
         'desc': 'PYROMANCER',
         'special': 'fireball'
@@ -84,12 +88,34 @@ CHARACTERS = [
         'skin': HAMMOUD_SKIN,
         'speed': 7, 
         'jump': -20, 
-        'health': 85, 
+        'health': 260,  # ~3x health for longer fights
         'dmg_mult': 0.85, 
         'desc': 'TECH WIZARD',
         'special': 'circuit_board'
     },
 ]
+
+# ===== ROUND SYSTEM =====
+WINS_REQUIRED = 2  # Best of 3 rounds
+ROUND_TRANSITION_TIME = 180  # 3 seconds at 60fps
+
+# ===== BLOCKING & CHIP DAMAGE =====
+CHIP_DAMAGE_PERCENT = 0.15  # 15% damage through block
+BLOCK_STUN_FRAMES = 12  # Frames defender can't act after blocking
+PUSHBLOCK_DISTANCE = 30  # Pixels pushed back on block
+
+# ===== SUPER METER =====
+SUPER_METER_MAX = 100
+SUPER_GAIN_ON_HIT = 8  # Meter gained when landing a hit
+SUPER_GAIN_ON_DAMAGE = 4  # Meter gained when taking damage
+ULTIMATE_DAMAGE = 80  # Ultimate move damage (before global scaling)
+
+# ===== MOTION INPUT BUFFER =====
+INPUT_BUFFER_FRAMES = 60  # Store 1 second of inputs at 60fps
+MOTION_INPUT_WINDOW = 20  # Frames to complete motion input
+
+# ===== ATTRACT MODE =====
+ATTRACT_MODE_TIMEOUT = 1800  # 30 seconds at 60fps
 
 # Attack Frame Data
 FRAME_DATA = {
@@ -98,9 +124,18 @@ FRAME_DATA = {
     'light_kick': {'startup': 4, 'active': 3, 'recovery': 6, 'total': 13, 'can_move_early': True},
     'heavy_kick': {'startup': 10, 'active': 5, 'recovery': 18, 'total': 33, 'can_move_early': False},
     'special': {'startup': 12, 'active': 10, 'recovery': 20, 'total': 42, 'can_move_early': False},
+    'ultimate': {'startup': 20, 'active': 15, 'recovery': 30, 'total': 65, 'can_move_early': False},
     # NOTE: Block and dash below are reserved for future implementation
     'block': {'startup': 5, 'active': -1, 'recovery': 3, 'total': -1, 'can_move_early': True},
     'dash': {'startup': 2, 'active': 8, 'recovery': 5, 'total': 15, 'can_move_early': True},
+}
+
+# Motion Input Patterns (for Hadouken-style inputs)
+# Stored as list of directional states: 'down', 'down_forward', 'forward'
+MOTION_INPUTS = {
+    'quarter_circle_forward': ['down', 'down_forward', 'forward'],  # QCF: ↓↘→
+    'quarter_circle_back': ['down', 'down_back', 'back'],           # QCB: ↓↙←
+    'dragon_punch': ['forward', 'down', 'down_forward'],            # DP: →↓↘
 }
 
 # Combo System

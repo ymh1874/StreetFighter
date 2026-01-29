@@ -1,4 +1,4 @@
-import pygame
+from pygame_compat import pygame
 
 class SpriteSheet:
     def __init__(self, filename):

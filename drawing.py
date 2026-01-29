@@ -3,13 +3,152 @@ Drawing module for Professor Fighting Game
 All characters drawn using pygame primitives (no sprites)
 """
 
-import pygame
+from pygame_compat import pygame
 import math
 import config as c
 
 # Animation constants
 SPINNING_KICK_ROTATION_SPEED = 12  # degrees per frame
 SPINNING_KICK_FRAME_CYCLE = 30  # frames per full rotation cycle
+
+
+# ==================== PARALLAX BACKGROUND ====================
+
+def draw_parallax_background(surface, p1_x, p2_x, frame):
+    """
+    Draw CMU-Q building-style pillars in the background with parallax effect.
+    Pillars move at 50% of the camera/player movement speed for depth.
+    
+    Args:
+        surface: pygame surface to draw on
+        p1_x: Player 1 x position
+        p2_x: Player 2 x position  
+        frame: Current frame for subtle animation
+    """
+    # Calculate camera center based on players
+    camera_center = (p1_x + p2_x) / 2
+    
+    # Parallax offset (50% of camera movement from center)
+    parallax_offset = (camera_center - c.SCREEN_WIDTH / 2) * 0.5
+    
+    # Draw sky gradient
+    sky_top = (40, 40, 80)
+    sky_bottom = (80, 60, 100)
+    for y in range(c.FLOOR_Y):
+        ratio = y / c.FLOOR_Y
+        color = (
+            int(sky_top[0] + (sky_bottom[0] - sky_top[0]) * ratio),
+            int(sky_top[1] + (sky_bottom[1] - sky_top[1]) * ratio),
+            int(sky_top[2] + (sky_bottom[2] - sky_top[2]) * ratio)
+        )
+        pygame.draw.line(surface, color, (0, y), (c.SCREEN_WIDTH, y))
+    
+    # Draw distant mountains/buildings (moves at 30%)
+    far_offset = parallax_offset * 0.3
+    for i in range(5):
+        base_x = i * 200 - 100 - far_offset
+        # Wrap around
+        while base_x < -200:
+            base_x += 1000
+        while base_x > c.SCREEN_WIDTH + 200:
+            base_x -= 1000
+        
+        # Simple building silhouette
+        height = 80 + (i % 3) * 40
+        building_rect = pygame.Rect(base_x, c.FLOOR_Y - height, 120, height)
+        pygame.draw.rect(surface, (30, 30, 50), building_rect)
+        
+        # Windows
+        for wy in range(3):
+            for wx in range(4):
+                window_x = base_x + 15 + wx * 25
+                window_y = c.FLOOR_Y - height + 15 + wy * 25
+                # Some windows lit, some dark
+                if (i + wx + wy + frame // 60) % 3 == 0:
+                    pygame.draw.rect(surface, (255, 255, 150), (window_x, window_y, 10, 12))
+                else:
+                    pygame.draw.rect(surface, (20, 20, 40), (window_x, window_y, 10, 12))
+    
+    # Draw CMU-Q style pillars (moves at 50%)
+    pillar_color = (60, 50, 70)
+    pillar_highlight = (80, 70, 90)
+    
+    for i in range(8):
+        base_x = i * 140 - 50 - parallax_offset
+        # Wrap around
+        while base_x < -80:
+            base_x += 1120
+        while base_x > c.SCREEN_WIDTH + 80:
+            base_x -= 1120
+        
+        pillar_width = 40
+        pillar_height = 200
+        pillar_y = c.FLOOR_Y - pillar_height
+        
+        # Main pillar body
+        pygame.draw.rect(surface, pillar_color, (base_x, pillar_y, pillar_width, pillar_height))
+        
+        # Pillar highlight (left side)
+        pygame.draw.rect(surface, pillar_highlight, (base_x, pillar_y, 8, pillar_height))
+        
+        # Pillar top (decorative)
+        top_rect = pygame.Rect(base_x - 5, pillar_y - 10, pillar_width + 10, 15)
+        pygame.draw.rect(surface, pillar_color, top_rect)
+        pygame.draw.rect(surface, pillar_highlight, (base_x - 5, pillar_y - 10, pillar_width + 10, 5))
+        
+        # Pillar base
+        base_rect = pygame.Rect(base_x - 5, c.FLOOR_Y - 15, pillar_width + 10, 15)
+        pygame.draw.rect(surface, pillar_color, base_rect)
+
+
+def draw_spark_particles(surface, x, y, count, color, frame):
+    """Draw spark particles for hit effects"""
+    for i in range(count):
+        angle = (i / count) * math.pi * 2 + frame * 0.2
+        distance = 10 + (frame % 10) * 2
+        px = x + int(math.cos(angle) * distance)
+        py = y + int(math.sin(angle) * distance)
+        size = max(1, 4 - frame // 3)
+        pygame.draw.circle(surface, color, (px, py), size)
+
+
+def draw_dust_cloud(surface, x, y, frame, color=(139, 90, 43)):
+    """Draw dust cloud for landing/jumping effects"""
+    alpha = max(0, 200 - frame * 20)
+    if alpha <= 0:
+        return
+    
+    # Create transparent surface for dust
+    dust_surf = pygame.Surface((80, 40), pygame.SRCALPHA)
+    
+    # Draw multiple dust puffs
+    for i in range(5):
+        offset_x = 10 + i * 12 + frame
+        offset_y = 20 - frame
+        size = max(2, 8 - frame)
+        dust_color = (*color, alpha)
+        pygame.draw.circle(dust_surf, dust_color, (offset_x, offset_y), size)
+    
+    surface.blit(dust_surf, (x - 40, y - 30))
+
+
+def draw_ultimate_flash(surface, fighter_x, fighter_y, frame):
+    """Draw screen flash and cinematic effect for ultimate moves"""
+    if frame < 10:
+        # Bright flash
+        flash_alpha = int(200 * (1 - frame / 10))
+        flash_surf = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+        flash_surf.fill((255, 255, 200))
+        flash_surf.set_alpha(flash_alpha)
+        surface.blit(flash_surf, (0, 0))
+    
+    # Aura around fighter
+    if frame < 30:
+        aura_size = 80 + frame * 2
+        aura_alpha = int(150 * (1 - frame / 30))
+        aura_surf = pygame.Surface((aura_size * 2, aura_size * 2), pygame.SRCALPHA)
+        pygame.draw.circle(aura_surf, (255, 200, 0, aura_alpha), (aura_size, aura_size), aura_size)
+        surface.blit(aura_surf, (fighter_x - aura_size, fighter_y - aura_size - 50))
 
 
 def draw_khalid(surface, x, y, facing_right, animation_state='idle', frame=0):
@@ -496,6 +635,285 @@ def draw_victory_dance(surface, x, y, char_name, skin_color, outfit_color, frame
         sparkle_x = x + 30 * math.cos(sparkle_rad)
         sparkle_y = dance_y - 40 + 30 * math.sin(sparkle_rad)
         pygame.draw.circle(surface, c.YELLOW, (int(sparkle_x), int(sparkle_y)), 3)
+
+
+def draw_victory_beatdown(surface, winner_x, winner_y, loser_x, loser_y,
+                          winner_name, winner_skin, winner_color,
+                          loser_name, loser_skin, loser_color, frame):
+    """
+    Draw an epic victory beatdown animation where the winner stomps/attacks the loser.
+    
+    Animation phases (180 frames total = 3 seconds at 60fps):
+    - Frames 0-30: Winner walks toward loser triumphantly
+    - Frames 31-60: Winner raises fist/leg
+    - Frames 61-90: Winner stomps/punches down on loser (with screen shake cue)
+    - Frames 91-120: Repeat stomp/punch
+    - Frames 121-150: Winner does victory pose
+    - Frames 151-180: Winner taunts/celebrates
+    
+    Returns: dict with screen_shake amount for that frame
+    """
+    result = {'screen_shake': 0, 'flash': False}
+    
+    # Determine winner facing direction (toward loser)
+    facing_right = loser_x > winner_x
+    flip = 1 if facing_right else -1
+    
+    # Calculate animation phase
+    if frame < 30:
+        # Phase 1: Walk toward loser
+        walk_progress = frame / 30.0
+        current_x = winner_x + (loser_x - winner_x) * walk_progress * 0.5  # Stop halfway
+        walk_frame = frame % 10  # Simple walk cycle
+        
+        # Bobbing motion for walk
+        bob = int(math.sin(frame * 0.5) * 3)
+        
+        # Draw winner walking
+        _draw_character_pose(surface, current_x, winner_y + bob, winner_name, 
+                            winner_skin, winner_color, facing_right, 'walk', frame)
+        
+        # Draw loser on ground
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+        
+    elif frame < 60:
+        # Phase 2: Raise fist/leg (wind up)
+        phase_frame = frame - 30
+        wind_up = phase_frame / 30.0
+        
+        stomp_x = winner_x + (loser_x - winner_x) * 0.5  # Stopped position
+        
+        # Raise up slightly for wind-up
+        raise_offset = int(wind_up * 20)
+        
+        # Draw winner in wind-up pose
+        _draw_character_pose(surface, stomp_x, winner_y - raise_offset, winner_name,
+                            winner_skin, winner_color, facing_right, 'windup', frame)
+        
+        # Draw loser cowering
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+        
+    elif frame < 90:
+        # Phase 3: STOMP/PUNCH - Impact!
+        phase_frame = frame - 60
+        stomp_x = winner_x + (loser_x - winner_x) * 0.5
+        
+        if phase_frame < 10:
+            # Downward motion
+            down_offset = int((phase_frame / 10.0) * 25)
+            _draw_character_pose(surface, stomp_x, winner_y + down_offset, winner_name,
+                                winner_skin, winner_color, facing_right, 'stomp', frame)
+        elif phase_frame < 15:
+            # Impact frame!
+            result['screen_shake'] = 15
+            result['flash'] = True
+            _draw_character_pose(surface, stomp_x, winner_y + 25, winner_name,
+                                winner_skin, winner_color, facing_right, 'stomp', frame)
+            # Draw impact lines
+            _draw_impact_lines(surface, loser_x, loser_y + 30, phase_frame - 10)
+        else:
+            # Recovery
+            recovery = (phase_frame - 15) / 15.0
+            _draw_character_pose(surface, stomp_x, winner_y + 25 - int(recovery * 25), winner_name,
+                                winner_skin, winner_color, facing_right, 'idle', frame)
+        
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+        
+    elif frame < 120:
+        # Phase 4: Second stomp!
+        phase_frame = frame - 90
+        stomp_x = winner_x + (loser_x - winner_x) * 0.5
+        
+        if phase_frame < 10:
+            # Wind up
+            raise_offset = int((phase_frame / 10.0) * 15)
+            _draw_character_pose(surface, stomp_x, winner_y - raise_offset, winner_name,
+                                winner_skin, winner_color, facing_right, 'windup', frame)
+        elif phase_frame < 18:
+            # STOMP!
+            down_progress = (phase_frame - 10) / 8.0
+            _draw_character_pose(surface, stomp_x, winner_y + int(down_progress * 20), winner_name,
+                                winner_skin, winner_color, facing_right, 'stomp', frame)
+            if phase_frame == 14:
+                result['screen_shake'] = 12
+                result['flash'] = True
+            if phase_frame >= 14:
+                _draw_impact_lines(surface, loser_x, loser_y + 30, phase_frame - 14)
+        else:
+            _draw_character_pose(surface, stomp_x, winner_y, winner_name,
+                                winner_skin, winner_color, facing_right, 'idle', frame)
+        
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+        
+    elif frame < 150:
+        # Phase 5: Victory pose
+        phase_frame = frame - 120
+        stomp_x = winner_x + (loser_x - winner_x) * 0.5
+        
+        # Arms raised pose
+        _draw_character_pose(surface, stomp_x, winner_y, winner_name,
+                            winner_skin, winner_color, facing_right, 'victory', frame)
+        
+        # Victory sparkles
+        for i in range(5):
+            sparkle_angle = (frame * 8 + i * 72) % 360
+            sparkle_rad = math.radians(sparkle_angle)
+            sparkle_x = stomp_x + 50 * math.cos(sparkle_rad)
+            sparkle_y = winner_y - 30 + 40 * math.sin(sparkle_rad)
+            size = 3 + int(math.sin(frame * 0.5 + i) * 2)
+            pygame.draw.circle(surface, c.YELLOW, (int(sparkle_x), int(sparkle_y)), max(1, size))
+        
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+        
+    else:
+        # Phase 6: Taunt/celebrate
+        phase_frame = frame - 150
+        stomp_x = winner_x + (loser_x - winner_x) * 0.5
+        
+        # Bouncing celebration
+        bounce = int(math.sin(phase_frame * 0.4) * 10)
+        _draw_character_pose(surface, stomp_x, winner_y + bounce, winner_name,
+                            winner_skin, winner_color, facing_right, 'taunt', frame)
+        
+        # More sparkles!
+        for i in range(8):
+            sparkle_angle = (frame * 12 + i * 45) % 360
+            sparkle_rad = math.radians(sparkle_angle)
+            dist = 40 + phase_frame * 0.5
+            sparkle_x = stomp_x + dist * math.cos(sparkle_rad)
+            sparkle_y = winner_y - 20 + dist * 0.7 * math.sin(sparkle_rad)
+            color = c.YELLOW if i % 2 == 0 else c.WHITE
+            pygame.draw.circle(surface, color, (int(sparkle_x), int(sparkle_y)), 4)
+        
+        draw_defeated_character(surface, loser_x, loser_y + 50, loser_name, loser_skin, loser_color)
+    
+    return result
+
+
+def _draw_character_pose(surface, x, y, char_name, skin_color, outfit_color, facing_right, pose, frame):
+    """Helper to draw character in specific victory animation pose"""
+    flip = 1 if facing_right else -1
+    
+    if pose == 'walk':
+        # Use normal idle with slight movement
+        if 'KHALID' in char_name:
+            draw_khalid(surface, x, y, facing_right, 'idle', frame)
+        elif 'EDUARDO' in char_name:
+            draw_eduardo(surface, x, y, facing_right, 'idle', frame)
+        elif 'HASAN' in char_name:
+            draw_hasan(surface, x, y, facing_right, 'idle', frame)
+        elif 'HAMMOUD' in char_name:
+            draw_hammoud(surface, x, y, facing_right, 'idle', frame)
+            
+    elif pose == 'windup':
+        # Character raising arm/leg to strike
+        x, y = int(x), int(y)
+        # Body
+        pygame.draw.rect(surface, outfit_color, (x - 12, y - 15, 24, 35))
+        # Head
+        pygame.draw.circle(surface, skin_color, (x, y - 25), 12)
+        # Angry eyes
+        pygame.draw.line(surface, c.BLACK, (x - 5 + flip * 2, y - 28), (x - 2 + flip * 2, y - 25), 2)
+        pygame.draw.line(surface, c.BLACK, (x + 2 + flip * 2, y - 28), (x + 5 + flip * 2, y - 25), 2)
+        # Raised arm
+        pygame.draw.line(surface, skin_color, (x + 10 * flip, y - 10), (x + 25 * flip, y - 35), 6)
+        pygame.draw.circle(surface, skin_color, (x + 25 * flip, y - 35), 5)
+        # Other arm
+        pygame.draw.line(surface, skin_color, (x - 10 * flip, y - 10), (x - 15 * flip, y + 5), 5)
+        # Legs spread
+        pygame.draw.line(surface, outfit_color, (x - 8, y + 20), (x - 15, y + 45), 7)
+        pygame.draw.line(surface, outfit_color, (x + 8, y + 20), (x + 15, y + 45), 7)
+        
+    elif pose == 'stomp':
+        # Character stomping down
+        x, y = int(x), int(y)
+        # Body leaning forward
+        pygame.draw.rect(surface, outfit_color, (x - 12 + 5 * flip, y - 15, 24, 35))
+        # Head
+        pygame.draw.circle(surface, skin_color, (x + 5 * flip, y - 25), 12)
+        # Fierce expression
+        pygame.draw.line(surface, c.BLACK, (x - 4 + 5 * flip, y - 27), (x + 4 + 5 * flip, y - 27), 3)
+        # Extended punch arm
+        pygame.draw.line(surface, skin_color, (x + 15 * flip, y - 5), (x + 40 * flip, y + 15), 7)
+        pygame.draw.circle(surface, skin_color, (x + 40 * flip, y + 15), 6)
+        # Trailing arm
+        pygame.draw.line(surface, skin_color, (x - 10 * flip, y - 5), (x - 20 * flip, y - 15), 5)
+        # One leg forward
+        pygame.draw.line(surface, outfit_color, (x, y + 20), (x + 25 * flip, y + 40), 8)
+        pygame.draw.line(surface, outfit_color, (x, y + 20), (x - 15 * flip, y + 45), 7)
+        
+    elif pose == 'victory':
+        # Arms raised in victory
+        x, y = int(x), int(y)
+        # Body
+        pygame.draw.rect(surface, outfit_color, (x - 12, y - 15, 24, 35))
+        # Head
+        pygame.draw.circle(surface, skin_color, (x, y - 25), 12)
+        # Big smile
+        pygame.draw.arc(surface, c.BLACK, (x - 6, y - 25, 12, 8), 3.14, 0, 2)
+        # Both arms raised!
+        pygame.draw.line(surface, skin_color, (x - 10, y - 10), (x - 25, y - 40), 6)
+        pygame.draw.line(surface, skin_color, (x + 10, y - 10), (x + 25, y - 40), 6)
+        # Fists
+        pygame.draw.circle(surface, skin_color, (x - 25, y - 40), 5)
+        pygame.draw.circle(surface, skin_color, (x + 25, y - 40), 5)
+        # Legs
+        pygame.draw.line(surface, outfit_color, (x - 8, y + 20), (x - 10, y + 45), 7)
+        pygame.draw.line(surface, outfit_color, (x + 8, y + 20), (x + 10, y + 45), 7)
+        
+    elif pose == 'taunt':
+        # Taunting pose - pointing at loser
+        x, y = int(x), int(y)
+        # Body
+        pygame.draw.rect(surface, outfit_color, (x - 12, y - 15, 24, 35))
+        # Head tilted
+        pygame.draw.circle(surface, skin_color, (x + 3 * flip, y - 25), 12)
+        # Smirk
+        pygame.draw.arc(surface, c.BLACK, (x - 4 + 3 * flip, y - 24, 8, 6), 3.14, 0, 2)
+        # Pointing arm
+        pygame.draw.line(surface, skin_color, (x + 10 * flip, y - 8), (x + 35 * flip, y + 5), 5)
+        pygame.draw.circle(surface, skin_color, (x + 35 * flip, y + 5), 4)
+        # Other arm on hip
+        pygame.draw.line(surface, skin_color, (x - 10 * flip, y - 5), (x - 18 * flip, y + 10), 5)
+        # Confident stance
+        pygame.draw.line(surface, outfit_color, (x - 10, y + 20), (x - 18, y + 45), 7)
+        pygame.draw.line(surface, outfit_color, (x + 10, y + 20), (x + 18, y + 45), 7)
+    else:
+        # Default idle
+        if 'KHALID' in char_name:
+            draw_khalid(surface, x, y, facing_right, 'idle', frame)
+        elif 'EDUARDO' in char_name:
+            draw_eduardo(surface, x, y, facing_right, 'idle', frame)
+        elif 'HASAN' in char_name:
+            draw_hasan(surface, x, y, facing_right, 'idle', frame)
+        elif 'HAMMOUD' in char_name:
+            draw_hammoud(surface, x, y, facing_right, 'idle', frame)
+
+
+def _draw_impact_lines(surface, x, y, impact_frame):
+    """Draw impact/shockwave lines at hit location"""
+    num_lines = 8
+    max_length = 30 + impact_frame * 5
+    
+    for i in range(num_lines):
+        angle = (i * 360 / num_lines) + impact_frame * 10
+        rad = math.radians(angle)
+        
+        start_dist = 10
+        end_dist = start_dist + max_length
+        
+        start_x = x + int(start_dist * math.cos(rad))
+        start_y = y + int(start_dist * math.sin(rad))
+        end_x = x + int(end_dist * math.cos(rad))
+        end_y = y + int(end_dist * math.sin(rad))
+        
+        # White impact lines
+        pygame.draw.line(surface, c.WHITE, (start_x, start_y), (end_x, end_y), 3)
+    
+    # Central flash
+    flash_size = 15 + impact_frame * 3
+    pygame.draw.circle(surface, c.YELLOW, (x, y), flash_size)
+    pygame.draw.circle(surface, c.WHITE, (x, y), flash_size // 2)
 
 
 def draw_dash_particles(surface, x, y, facing_right, frame):

@@ -24,7 +24,7 @@ Key-Map for Arcade Machine:
 | Start        | 9      |
 """
 
-import pygame
+from pygame_compat import pygame
 import sys
 
 # Store state for all connected joysticks

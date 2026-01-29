@@ -19,13 +19,14 @@ Author: Senior Game Developer
 Date: 2026
 """
 
-import pygame
+from pygame_compat import pygame
 import sys
 import random
 import os
 import config as c
 from entities import Fighter, Particle, SpinningKickEffect, HitEffect, Projectile
-from ui_components import Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect
+from ui_components import (Button, VintageTextRenderer, ArcadeFrame, ScanlineEffect,
+                           GradientBackground, draw_panel, draw_health_bar)
 from combat import CombatSystem
 import drawing
 import joystick
@@ -75,6 +76,12 @@ class Game:
         self.hit_effects = []  # Comic book hit effects
         self.ko_slowdown = False
         self.slowdown_timer = 0
+        
+        # Hit freeze effect (brief pause on heavy hits for impact)
+        self.hit_freeze_frames = 0
+        
+        # Counter attack window (frames after successful parry where attacks do bonus damage)
+        self.counter_attack_window = {'p1': 0, 'p2': 0}
         
         # Set random seed for consistent ground texture
         random.seed(42)
@@ -144,6 +151,20 @@ class Game:
         self.combat_system = CombatSystem()  # Combat system for tracking combos
         self.winner_sequence_active = False
         self.winner_sequence_frame = 0
+        
+        # Round system (Best of 3)
+        self.p1_wins = 0
+        self.p2_wins = 0
+        self.current_round = 1
+        self.round_over = False
+        self.round_transition_timer = 0
+        self.round_winner = None  # "p1" or "p2" or "draw"
+        
+        # Attract mode
+        self.idle_timer = 0  # Frames since last input
+        self.attract_mode = False
+        self.ai_p1 = None  # AI controller for P1 in attract mode
+        self.ai_p2 = None  # AI controller for P2 in attract mode
     
     # ==================== GAME LOOP ====================
     
@@ -257,7 +278,7 @@ class Game:
                     self.p2_cursor = (self.p2_cursor - 1) % len(c.CHARACTERS)
                 elif key == pygame.K_RIGHT:
                     self.p2_cursor = (self.p2_cursor + 1) % len(c.CHARACTERS)
-                elif key == pygame.K_KP1:
+                elif key == pygame.K_a:
                     self.p2_selected = True
                     
         # Game over screen
@@ -460,6 +481,25 @@ class Game:
             mouse_pos: Current mouse position tuple (x, y)
             mouse_clicked: Boolean indicating if mouse was clicked
         """
+        # Track idle time for attract mode
+        keys = pygame.key.get_pressed()
+        any_input = mouse_clicked or any(keys) or any(self.joy_input_state[0]['buttons']) or any(self.joy_input_state[1]['buttons'])
+        
+        if any_input:
+            self.idle_timer = 0
+            if self.attract_mode:
+                # Exit attract mode on any input
+                self.attract_mode = False
+                self.state = "MAIN_MENU"
+                return
+        else:
+            self.idle_timer += 1
+        
+        # Start attract mode after timeout
+        if self.idle_timer >= c.ATTRACT_MODE_TIMEOUT and not self.attract_mode:
+            self._start_attract_mode()
+            return
+        
         # Update all buttons with mouse position
         for i, button in enumerate(self.menu_buttons):
             button.update(mouse_pos)
@@ -487,21 +527,22 @@ class Game:
     
     def _draw_main_menu(self):
         """Render main menu screen with vintage arcade styling"""
+        # Draw gradient background for polish
+        GradientBackground.draw_vertical(self.screen, (20, 20, 40), (5, 5, 15))
+        
         # Title section with background panel
-        title = self.text_renderer.render(self.menu_title, 'large', c.ORANGE)
+        title = self.text_renderer.render_outlined(self.menu_title, 'large', c.ORANGE, c.BLACK, 3)
         title_x = c.SCREEN_WIDTH // 2 - title.get_width() // 2
         title_y = 80
         
-        # Title background panel
+        # Title background panel with enhanced styling
         title_panel = pygame.Rect(title_x - 40, title_y - 20, title.get_width() + 80, title.get_height() + 40)
-        pygame.draw.rect(self.screen, c.BLACK, title_panel)
-        pygame.draw.rect(self.screen, c.ORANGE, title_panel, 4)
-        pygame.draw.rect(self.screen, c.YELLOW, title_panel.inflate(-10, -10), 2)
+        draw_panel(self.screen, title_panel, (30, 30, 50), c.ORANGE, 4, shadow=True)
         
         self.screen.blit(title, (title_x, title_y))
         
-        # Subtitle
-        subtitle = self.text_renderer.render(self.menu_subtitle, 'medium', c.WHITE)
+        # Subtitle with outline for better visibility
+        subtitle = self.text_renderer.render_outlined(self.menu_subtitle, 'medium', c.WHITE, c.BLACK, 2)
         subtitle_x = c.SCREEN_WIDTH // 2 - subtitle.get_width() // 2
         self.screen.blit(subtitle, (subtitle_x, 170))
         
@@ -509,10 +550,18 @@ class Game:
         for button in self.menu_buttons:
             button.draw(self.screen, self.text_renderer)
         
+        # Decorative line
+        pygame.draw.line(self.screen, c.ORANGE, (100, 230), (c.SCREEN_WIDTH - 100, 230), 2)
+        pygame.draw.line(self.screen, c.ORANGE, (100, 520), (c.SCREEN_WIDTH - 100, 520), 2)
+        
         # Footer text
-        footer = self.text_renderer.render("USE ARROW KEYS OR MOUSE", 'small', c.GRAY)
+        footer = self.text_renderer.render("USE ARROW KEYS OR MOUSE  |  JOYSTICK SUPPORTED", 'small', c.GRAY)
         footer_x = c.SCREEN_WIDTH // 2 - footer.get_width() // 2
-        self.screen.blit(footer, (footer_x, 540))
+        self.screen.blit(footer, (footer_x, 545))
+        
+        # Version info
+        version = self.text_renderer.render("v1.0", 'small', c.DARK_GRAY)
+        self.screen.blit(version, (c.SCREEN_WIDTH - version.get_width() - 10, c.SCREEN_HEIGHT - 25))
     
     # ==================== CONTROLS SCREEN STATE ====================
     
@@ -683,12 +732,14 @@ class Game:
     
     def _draw_character_select(self):
         """Render character selection screen with perfect alignment"""
-        # Title
-        title = self.text_renderer.render("CHOOSE YOUR FIGHTER", 'large', c.WHITE)
+        # Draw gradient background
+        GradientBackground.draw_vertical(self.screen, (30, 15, 40), (10, 5, 20))
+        
+        # Title with outline
+        title = self.text_renderer.render_outlined("CHOOSE YOUR FIGHTER", 'large', c.WHITE, c.BLACK, 3)
         title_x = c.SCREEN_WIDTH // 2 - title.get_width() // 2
         title_bg = pygame.Rect(title_x - 30, 35, title.get_width() + 60, 70)
-        pygame.draw.rect(self.screen, c.BLACK, title_bg)
-        pygame.draw.rect(self.screen, c.ORANGE, title_bg, 4)
+        draw_panel(self.screen, title_bg, (40, 20, 50), c.ORANGE, 4)
         self.screen.blit(title, (title_x, 50))
         
         # Character grid - perfectly centered
@@ -704,13 +755,13 @@ class Game:
             x = start_x + i * (box_width + gap)
             y = start_y
             
-            # Character box with shadow
-            shadow_rect = pygame.Rect(x + 4, y + 4, box_width, box_height)
+            # Character box with shadow and gradient effect
             char_rect = pygame.Rect(x, y, box_width, box_height)
+            draw_panel(self.screen, char_rect, (50, 50, 60), c.WHITE, 3)
             
-            pygame.draw.rect(self.screen, c.BLACK, shadow_rect)
-            pygame.draw.rect(self.screen, c.GRAY, char_rect)
-            pygame.draw.rect(self.screen, c.WHITE, char_rect, 3)
+            # Inner gradient for depth
+            inner_rect = pygame.Rect(x + 5, y + 5, box_width - 10, box_height - 10)
+            GradientBackground.draw_vertical(self.screen, (60, 60, 70), (30, 30, 40), inner_rect)
             
             # Draw character portrait (head only, centered in box)
             portrait_x = x + box_width // 2
@@ -725,8 +776,8 @@ class Game:
             elif 'HAMMOUD' in char_name:
                 drawing.draw_hammoud(self.screen, portrait_x, portrait_y + 30, True, 'idle', 0)
             
-            # Character name - centered, smaller font
-            name = self.text_renderer.render(char['name'], 'small', c.WHITE)
+            # Character name - centered with outline
+            name = self.text_renderer.render_outlined(char['name'], 'small', c.WHITE, c.BLACK, 1)
             name_x = x + box_width // 2 - name.get_width() // 2
             self.screen.blit(name, (name_x, y + box_height + 8))
             
@@ -793,6 +844,14 @@ class Game:
         self.combat_system.register_fighter("p1")
         self.combat_system.register_fighter("p2")
         
+        # Reset round system for new match
+        self.p1_wins = 0
+        self.p2_wins = 0
+        self.current_round = 1
+        self.round_over = False
+        self.round_transition_timer = 0
+        self.round_winner = None
+        
         # Reset ALL fight variables and clear leftover effects
         self.round_timer = 99
         self.particles = []
@@ -808,30 +867,195 @@ class Game:
         self.state = "FIGHT"
         self.last_timer_update = pygame.time.get_ticks()
     
+    def _start_attract_mode(self):
+        """Start AI vs AI attract mode demo - exciting showcase of gameplay!"""
+        self.attract_mode = True
+        
+        # Select random characters
+        self.p1_cursor = random.randint(0, len(c.CHARACTERS) - 1)
+        self.p2_cursor = random.randint(0, len(c.CHARACTERS) - 1)
+        while self.p2_cursor == self.p1_cursor:
+            self.p2_cursor = random.randint(0, len(c.CHARACTERS) - 1)
+        
+        # Start fight with AI control
+        controls_p1 = c.DEFAULT_P1_CONTROLS
+        controls_p2 = c.DEFAULT_P2_CONTROLS
+        
+        stats_p1 = c.CHARACTERS[self.p1_cursor]
+        stats_p2 = c.CHARACTERS[self.p2_cursor]
+        
+        spawn_y = c.FLOOR_Y - c.P_HEIGHT
+        self.p1 = Fighter(200, spawn_y, stats_p1, controls_p1, is_p2=False,
+                         combat_system=self.combat_system, fighter_id="p1",
+                         joy_input_getter=self.get_joy_action)
+        self.p2 = Fighter(550, spawn_y, stats_p2, controls_p2, is_p2=True,
+                         combat_system=self.combat_system, fighter_id="p2",
+                         joy_input_getter=self.get_joy_action)
+        
+        # Start with some super meter for exciting ultimates early on!
+        self.p1.super_meter = 50
+        self.p2.super_meter = 70  # P2 gets more to show ultimate sooner
+        
+        self.combat_system.register_fighter("p1")
+        self.combat_system.register_fighter("p2")
+        
+        # Reset round system
+        self.p1_wins = 0
+        self.p2_wins = 0
+        self.current_round = 1
+        self.round_over = False
+        self.round_transition_timer = 0
+        
+        # Reset fight variables
+        self.round_timer = 99
+        self.particles = []
+        self.projectiles = []
+        self.special_effects = []
+        self.hit_effects = []
+        self.screen_shake = 0
+        self.winner_sequence_active = False
+        
+        self.state = "FIGHT"
+        self.last_timer_update = pygame.time.get_ticks()
+    
+    def _reset_round(self):
+        """Reset positions and health for new round (keep super meter)"""
+        spawn_y = c.FLOOR_Y - c.P_HEIGHT
+        
+        # Store super meter
+        p1_meter = getattr(self.p1, 'super_meter', 0)
+        p2_meter = getattr(self.p2, 'super_meter', 0)
+        
+        # Reset positions
+        self.p1.rect.x = 200
+        self.p1.rect.y = spawn_y
+        self.p2.rect.x = 550
+        self.p2.rect.y = spawn_y
+        
+        # Reset health
+        self.p1.health = self.p1.max_health
+        self.p2.health = self.p2.max_health
+        self.p1.alive = True
+        self.p2.alive = True
+        
+        # Restore super meter
+        self.p1.super_meter = p1_meter
+        self.p2.super_meter = p2_meter
+        
+        # Reset states
+        self.p1.attacking = False
+        self.p1.hit_stun = 0
+        self.p1.blocking = False
+        self.p1.block_stun = 0
+        self.p2.attacking = False
+        self.p2.hit_stun = 0
+        self.p2.blocking = False
+        self.p2.block_stun = 0
+        
+        # Reset fight variables
+        self.round_timer = 99
+        self.particles = []
+        self.projectiles = []
+        self.special_effects = []
+        self.hit_effects = []
+        self.screen_shake = 0
+        self.round_over = False
+        self.round_transition_timer = 0
+        self.round_winner = None
+        self.winner_sequence_active = False
+        self.winner_sequence_frame = 0
+        self.last_timer_update = pygame.time.get_ticks()
+        self.current_round += 1
+    
     def _update_fight(self):
         """Update fight logic"""
+        # Check for input during attract mode
+        if self.attract_mode:
+            keys = pygame.key.get_pressed()
+            any_input = any(keys) or any(self.joy_input_state[0]['buttons']) or any(self.joy_input_state[1]['buttons'])
+            if any_input:
+                self.attract_mode = False
+                self.idle_timer = 0
+                self.state = "MAIN_MENU"
+                return
+            
+            # Run simple AI for both fighters
+            self._update_ai_fighter(self.p1, self.p2)
+            self._update_ai_fighter(self.p2, self.p1)
+        
+        # Handle round transition
+        if self.round_over:
+            self.round_transition_timer += 1
+            
+            # Show "K.O." for first 60 frames
+            if self.round_transition_timer >= c.ROUND_TRANSITION_TIME:
+                # Check if match is over
+                if self.p1_wins >= c.WINS_REQUIRED or self.p2_wins >= c.WINS_REQUIRED:
+                    self.state = "GAME_OVER"
+                else:
+                    # Start next round
+                    self._reset_round()
+            return
+        
+        # Handle hit freeze (brief pause on heavy hits for impact)
+        if self.hit_freeze_frames > 0:
+            self.hit_freeze_frames -= 1
+            return  # Skip update during hit freeze
+        
+        # Update counter attack windows
+        for player in ['p1', 'p2']:
+            if self.counter_attack_window[player] > 0:
+                self.counter_attack_window[player] -= 1
+        
         # Update timer
         if pygame.time.get_ticks() - self.last_timer_update > 1000:
             self.round_timer -= 1
             self.last_timer_update = pygame.time.get_ticks()
         
-        # Check win conditions
+        # ATTRACT MODE: Keep fighters alive for continuous demo
+        if self.attract_mode:
+            # Regenerate health when low to prevent death
+            if self.p1.health < 50:
+                self.p1.health = min(self.p1.max_health, self.p1.health + 2)
+            if self.p2.health < 50:
+                self.p2.health = min(self.p2.max_health, self.p2.health + 2)
+            # Reset timer to prevent timeout
+            if self.round_timer < 30:
+                self.round_timer = 99
+        
+        # Check win conditions (round over, not game over)
         if self.p1.health <= 0 or self.p2.health <= 0 or self.round_timer <= 0:
-            # Add KO effect and start winner sequence
-            if self.p1.health <= 0:
-                self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
-                if not self.winner_sequence_active:
+            if not self.round_over:
+                self.round_over = True
+                self.round_transition_timer = 0
+                
+                # Determine round winner
+                if self.p1.health <= 0 and self.p2.health <= 0:
+                    self.round_winner = "draw"
+                elif self.p1.health <= 0:
+                    self.round_winner = "p2"
+                    self.p2_wins += 1
+                    self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery - 50, 'ko', c.RED))
+                elif self.p2.health <= 0:
+                    self.round_winner = "p1"
+                    self.p1_wins += 1
+                    self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
+                else:
+                    # Time out - higher health wins
+                    if self.p1.health > self.p2.health:
+                        self.round_winner = "p1"
+                        self.p1_wins += 1
+                    elif self.p2.health > self.p1.health:
+                        self.round_winner = "p2"
+                        self.p2_wins += 1
+                    else:
+                        self.round_winner = "draw"
+                
+                # Trigger winner sequence if match is over
+                if self.p1_wins >= c.WINS_REQUIRED or self.p2_wins >= c.WINS_REQUIRED:
                     self.winner_sequence_active = True
                     self.winner_sequence_frame = 0
-            elif self.p2.health <= 0:
-                self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery - 50, 'ko', c.BLUE))
-                if not self.winner_sequence_active:
-                    self.winner_sequence_active = True
-                    self.winner_sequence_frame = 0
-            elif self.round_timer <= 0:
-                if not self.winner_sequence_active:
-                    self.winner_sequence_active = True
-                    self.winner_sequence_frame = 0
+            return
         
         # Winner sequence animation - exactly 3 seconds (180 frames at 60fps)
         if self.winner_sequence_active:
@@ -900,18 +1124,25 @@ class Game:
                     self.p2.color_flash = 10
                     self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.YELLOW)
                     self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'parry', c.YELLOW))
+                    # Grant counter attack window (60 frames = 1 second)
+                    self.counter_attack_window['p2'] = 60
+                    self.hit_freeze_frames = 5  # Brief freeze for impact
                 else:
                     # Apply combo damage scaling
                     damage = proj.damage
                     if self.p1.combat_system and self.p1.fighter_id:
-                        self.p1.combat_system.increment_combo(self.p1.fighter_id)
-                        combo_multiplier = self.p1.combat_system.get_combo_damage_multiplier(self.p1.fighter_id)
-                        damage *= combo_multiplier
+                        combo_info = self.p1.combat_system.record_hit(self.p1.fighter_id, damage, 'special')
+                        damage *= combo_info['multiplier']
+                    
+                    # Check for counter attack bonus
+                    if self.counter_attack_window['p1'] > 0:
+                        damage *= 1.5  # 50% bonus damage on counter
                     
                     self.p2.take_damage(damage, 10, 15, self.p1.facing_right)
                     self._spawn_particles(self.p2.rect.centerx, self.p2.rect.centery, c.ORANGE)
                     self.hit_effects.append(HitEffect(self.p2.rect.centerx, self.p2.rect.centery, 'special', c.ORANGE))
                     self.screen_shake = 8
+                    self.hit_freeze_frames = 4  # Brief freeze on heavy hits
                     proj.active = False
             elif proj.owner == self.p2 and proj_rect.colliderect(self.p1.rect):
                 # Check if p1 is parrying
@@ -923,18 +1154,25 @@ class Game:
                     self.p1.color_flash = 10
                     self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.YELLOW)
                     self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'parry', c.YELLOW))
+                    # Grant counter attack window (60 frames = 1 second)
+                    self.counter_attack_window['p1'] = 60
+                    self.hit_freeze_frames = 5  # Brief freeze for impact
                 else:
                     # Apply combo damage scaling
                     damage = proj.damage
                     if self.p2.combat_system and self.p2.fighter_id:
-                        self.p2.combat_system.increment_combo(self.p2.fighter_id)
-                        combo_multiplier = self.p2.combat_system.get_combo_damage_multiplier(self.p2.fighter_id)
-                        damage *= combo_multiplier
+                        combo_info = self.p2.combat_system.record_hit(self.p2.fighter_id, damage, 'special')
+                        damage *= combo_info['multiplier']
+                    
+                    # Check for counter attack bonus
+                    if self.counter_attack_window['p2'] > 0:
+                        damage *= 1.5  # 50% bonus damage on counter
                     
                     self.p1.take_damage(damage, 10, 15, self.p2.facing_right)
                     self._spawn_particles(self.p1.rect.centerx, self.p1.rect.centery, c.ORANGE)
                     self.hit_effects.append(HitEffect(self.p1.rect.centerx, self.p1.rect.centery, 'special', c.ORANGE))
                     self.screen_shake = 8
+                    self.hit_freeze_frames = 4  # Brief freeze on heavy hits
                     proj.active = False
         
         # Update special effects
@@ -1004,6 +1242,12 @@ class Game:
         # Apply screen shake offset
         shake_x, shake_y = self.screen_shake_offset
         
+        # Get current frame for animations
+        current_frame = pygame.time.get_ticks() // 16  # ~60fps
+        
+        # Draw parallax background with CMU-Q pillars
+        drawing.draw_parallax_background(self.screen, self.p1.rect.centerx, self.p2.rect.centerx, current_frame)
+        
         # Draw brown dirt floor (no perspective grid)
         dirt_floor = pygame.Rect(0 + shake_x, c.FLOOR_Y + shake_y, c.SCREEN_WIDTH, c.SCREEN_HEIGHT - c.FLOOR_Y)
         pygame.draw.rect(self.screen, c.DIRT_BROWN, dirt_floor)
@@ -1042,14 +1286,26 @@ class Game:
             # Draw blood puddle at loser's position
             drawing.draw_blood_puddle(game_surface, loser.rect.centerx, c.FLOOR_Y, 80)
             
-            # Draw defeated character on top of blood puddle
-            drawing.draw_defeated_character(game_surface, loser.rect.centerx, c.FLOOR_Y,
-                                           loser.stats['name'], loser.stats['skin'], loser.stats['color'])
+            # Use epic beatdown animation!
+            result = drawing.draw_victory_beatdown(
+                game_surface,
+                winner.rect.centerx, winner.rect.bottom,
+                loser.rect.centerx, c.FLOOR_Y,
+                winner.stats['name'], winner.stats['skin'], winner.stats['color'],
+                loser.stats['name'], loser.stats['skin'], loser.stats['color'],
+                self.winner_sequence_frame
+            )
             
-            # Draw winner doing victory dance
-            drawing.draw_victory_dance(game_surface, winner.rect.centerx, winner.rect.bottom,
-                                      winner.stats['name'], winner.stats['skin'], winner.stats['color'],
-                                      self.winner_sequence_frame)
+            # Apply screen shake from beatdown hits
+            if result.get('screen_shake', 0) > 0:
+                self.screen_shake = result['screen_shake']
+            
+            # Flash effect on impact
+            if result.get('flash', False):
+                flash_surface = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+                flash_surface.fill(c.WHITE)
+                flash_surface.set_alpha(100)
+                game_surface.blit(flash_surface, (0, 0))
         else:
             self.p1.draw(game_surface)
             self.p2.draw(game_surface)
@@ -1187,15 +1443,224 @@ class Game:
         pygame.draw.rect(self.screen, c.ORANGE, timer_bg, 3)
         self.screen.blit(timer, (timer_x, 10))
         
-        # FIGHT! text at start
+        # Draw combo counters
+        self._draw_combo_display()
+        
+        # Draw round wins indicators
+        self._draw_round_wins()
+        
+        # Draw super meter bars
+        self._draw_super_meters()
+        
+        # FIGHT! text at start or round number
         if self.round_timer > 96:
-            fight_text = self.text_renderer.render("FIGHT!", 'large', c.YELLOW)
-            fight_x = c.SCREEN_WIDTH // 2 - fight_text.get_width() // 2
-            fight_bg = pygame.Rect(fight_x - 20, c.SCREEN_HEIGHT // 2 - 50, 
-                                  fight_text.get_width() + 40, 90)
-            pygame.draw.rect(self.screen, c.BLACK, fight_bg)
-            pygame.draw.rect(self.screen, c.ORANGE, fight_bg, 5)
-            self.screen.blit(fight_text, (fight_x, c.SCREEN_HEIGHT // 2 - 30))
+            # Show round number first, then FIGHT!
+            if self.round_timer > 97:
+                round_text = self.text_renderer.render_outlined(f"ROUND {self.current_round}", 'large', c.WHITE, c.BLACK, 3)
+                round_x = c.SCREEN_WIDTH // 2 - round_text.get_width() // 2
+                round_bg = pygame.Rect(round_x - 20, c.SCREEN_HEIGHT // 2 - 50, 
+                                      round_text.get_width() + 40, 90)
+                pygame.draw.rect(self.screen, c.BLACK, round_bg)
+                pygame.draw.rect(self.screen, c.ORANGE, round_bg, 5)
+                self.screen.blit(round_text, (round_x, c.SCREEN_HEIGHT // 2 - 30))
+            else:
+                fight_text = self.text_renderer.render_outlined("FIGHT!", 'large', c.YELLOW, c.BLACK, 3)
+                fight_x = c.SCREEN_WIDTH // 2 - fight_text.get_width() // 2
+                fight_bg = pygame.Rect(fight_x - 20, c.SCREEN_HEIGHT // 2 - 50, 
+                                      fight_text.get_width() + 40, 90)
+                pygame.draw.rect(self.screen, c.BLACK, fight_bg)
+                pygame.draw.rect(self.screen, c.ORANGE, fight_bg, 5)
+                self.screen.blit(fight_text, (fight_x, c.SCREEN_HEIGHT // 2 - 30))
+        
+        # Draw round over transition
+        if self.round_over:
+            self._draw_round_transition()
+        
+        # Draw attract mode banner
+        if self.attract_mode:
+            banner = self.text_renderer.render_outlined("DEMO - PRESS ANY BUTTON TO PLAY", 'medium', c.YELLOW, c.BLACK, 2)
+            banner_x = c.SCREEN_WIDTH // 2 - banner.get_width() // 2
+            # Pulsing effect
+            pulse = abs((pygame.time.get_ticks() % 1000) - 500) / 500.0
+            alpha = int(128 + 127 * pulse)
+            banner.set_alpha(alpha)
+            self.screen.blit(banner, (banner_x, c.SCREEN_HEIGHT - 50))
+    
+    def _draw_round_wins(self):
+        """Draw round win indicators (circles/gems)"""
+        gem_radius = 8
+        gem_y = 58
+        
+        # P1 wins (left side)
+        for i in range(c.WINS_REQUIRED):
+            gem_x = 180 + i * 25
+            if i < self.p1_wins:
+                # Won round - filled yellow
+                pygame.draw.circle(self.screen, c.YELLOW, (gem_x, gem_y), gem_radius)
+            else:
+                # Not won yet - empty
+                pygame.draw.circle(self.screen, c.DARK_GRAY, (gem_x, gem_y), gem_radius)
+            pygame.draw.circle(self.screen, c.WHITE, (gem_x, gem_y), gem_radius, 2)
+        
+        # P2 wins (right side)
+        p2_start_x = c.SCREEN_WIDTH - 180 - (c.WINS_REQUIRED - 1) * 25
+        for i in range(c.WINS_REQUIRED):
+            gem_x = p2_start_x + i * 25
+            if i < self.p2_wins:
+                # Won round - filled yellow
+                pygame.draw.circle(self.screen, c.YELLOW, (gem_x, gem_y), gem_radius)
+            else:
+                # Not won yet - empty
+                pygame.draw.circle(self.screen, c.DARK_GRAY, (gem_x, gem_y), gem_radius)
+            pygame.draw.circle(self.screen, c.WHITE, (gem_x, gem_y), gem_radius, 2)
+    
+    def _draw_super_meters(self):
+        """Draw super meter bars at bottom of screen"""
+        meter_width = 250
+        meter_height = 20
+        meter_y = c.SCREEN_HEIGHT - 40
+        
+        # P1 super meter (bottom left)
+        p1_meter = getattr(self.p1, 'super_meter', 0)
+        p1_ratio = min(1.0, p1_meter / c.SUPER_METER_MAX)
+        
+        pygame.draw.rect(self.screen, c.BLACK, (18, meter_y - 2, meter_width + 4, meter_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (20, meter_y, meter_width, meter_height))
+        
+        if p1_ratio > 0:
+            # Gradient color from blue to yellow when full
+            if p1_ratio >= 1.0:
+                color = c.YELLOW
+                # Pulsing effect when full
+                pulse = abs((pygame.time.get_ticks() % 500) - 250) / 250.0
+                color = (int(255 * pulse), int(255 * pulse), 0)
+            else:
+                color = c.PURPLE
+            pygame.draw.rect(self.screen, color, (20, meter_y, int(meter_width * p1_ratio), meter_height))
+        
+        pygame.draw.rect(self.screen, c.WHITE, (20, meter_y, meter_width, meter_height), 2)
+        
+        # Super label
+        super_label = self.text_renderer.render("SUPER", 'small', c.WHITE)
+        self.screen.blit(super_label, (22, meter_y - 15))
+        
+        # P2 super meter (bottom right)
+        p2_meter = getattr(self.p2, 'super_meter', 0)
+        p2_ratio = min(1.0, p2_meter / c.SUPER_METER_MAX)
+        p2_x = c.SCREEN_WIDTH - 20 - meter_width
+        
+        pygame.draw.rect(self.screen, c.BLACK, (p2_x - 2, meter_y - 2, meter_width + 4, meter_height + 4))
+        pygame.draw.rect(self.screen, c.DARK_GRAY, (p2_x, meter_y, meter_width, meter_height))
+        
+        if p2_ratio > 0:
+            if p2_ratio >= 1.0:
+                pulse = abs((pygame.time.get_ticks() % 500) - 250) / 250.0
+                color = (int(255 * pulse), int(255 * pulse), 0)
+            else:
+                color = c.PURPLE
+            pygame.draw.rect(self.screen, color, (p2_x, meter_y, int(meter_width * p2_ratio), meter_height))
+        
+        pygame.draw.rect(self.screen, c.WHITE, (p2_x, meter_y, meter_width, meter_height), 2)
+        
+        super_label2 = self.text_renderer.render("SUPER", 'small', c.WHITE)
+        self.screen.blit(super_label2, (p2_x + 2, meter_y - 15))
+    
+    def _draw_round_transition(self):
+        """Draw round over transition screen"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+        overlay.set_alpha(150)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+        
+        # K.O. text
+        if self.round_transition_timer < 60:
+            ko_text = self.text_renderer.render_outlined("K.O.!", 'large', c.RED, c.BLACK, 4)
+            ko_x = c.SCREEN_WIDTH // 2 - ko_text.get_width() // 2
+            self.screen.blit(ko_text, (ko_x, c.SCREEN_HEIGHT // 2 - 60))
+        
+        # Round winner text
+        if self.round_transition_timer >= 60:
+            if self.round_winner == "p1":
+                winner_text = f"{self.p1.stats['name']} WINS ROUND {self.current_round}!"
+                color = c.RED
+            elif self.round_winner == "p2":
+                winner_text = f"{self.p2.stats['name']} WINS ROUND {self.current_round}!"
+                color = c.BLUE
+            else:
+                winner_text = "DOUBLE K.O.!"
+                color = c.YELLOW
+            
+            text_surf = self.text_renderer.render_outlined(winner_text, 'medium', color, c.BLACK, 3)
+            text_x = c.SCREEN_WIDTH // 2 - text_surf.get_width() // 2
+            self.screen.blit(text_surf, (text_x, c.SCREEN_HEIGHT // 2 - 20))
+            
+            # Show win counts
+            wins_text = f"P1: {self.p1_wins}  -  P2: {self.p2_wins}"
+            wins_surf = self.text_renderer.render(wins_text, 'medium', c.WHITE)
+            wins_x = c.SCREEN_WIDTH // 2 - wins_surf.get_width() // 2
+            self.screen.blit(wins_surf, (wins_x, c.SCREEN_HEIGHT // 2 + 40))
+    
+    def _draw_combo_display(self):
+        """Draw combo counter and announcements"""
+        current_time = pygame.time.get_ticks()
+        
+        # Update combat system to check for dropped combos
+        self.combat_system.update(current_time)
+        
+        # Draw P1 combo counter
+        p1_combo = self.combat_system.get_combo_count("p1")
+        if p1_combo >= 2:
+            combo_text = self.text_renderer.render_outlined(f"{p1_combo} HITS", 'medium', c.YELLOW, c.BLACK, 2)
+            self.screen.blit(combo_text, (20, 110))
+        
+        # Draw P2 combo counter
+        p2_combo = self.combat_system.get_combo_count("p2")
+        if p2_combo >= 2:
+            combo_text = self.text_renderer.render_outlined(f"{p2_combo} HITS", 'medium', c.YELLOW, c.BLACK, 2)
+            self.screen.blit(combo_text, (c.SCREEN_WIDTH - combo_text.get_width() - 20, 110))
+        
+        # Draw counter attack indicator (flashing "COUNTER!" text)
+        if self.counter_attack_window['p1'] > 0:
+            flash = (pygame.time.get_ticks() // 100) % 2 == 0
+            if flash:
+                counter_text = self.text_renderer.render_outlined("COUNTER!", 'small', c.GREEN, c.BLACK, 1)
+                self.screen.blit(counter_text, (20, 140))
+        
+        if self.counter_attack_window['p2'] > 0:
+            flash = (pygame.time.get_ticks() // 100) % 2 == 0
+            if flash:
+                counter_text = self.text_renderer.render_outlined("COUNTER!", 'small', c.GREEN, c.BLACK, 1)
+                self.screen.blit(counter_text, (c.SCREEN_WIDTH - counter_text.get_width() - 20, 140))
+        
+        # Draw combo announcements
+        announcements = self.combat_system.get_announcements()
+        for announcement in announcements:
+            age = current_time - announcement['time']
+            if age < 2000:  # Show for 2 seconds
+                # Calculate animation
+                alpha = int(255 * (1 - age / 2000))
+                scale = 1.0 + (age / 2000) * 0.3  # Grow slightly over time
+                y_offset = int(age / 50)  # Float upward
+                
+                text = announcement['text']
+                is_p1 = announcement['fighter_id'] == "p1"
+                color = c.RED if is_p1 else c.BLUE
+                
+                # Render announcement text
+                ann_text = self.text_renderer.render_outlined(text, 'medium', color, c.BLACK, 2)
+                
+                # Position based on which player
+                if is_p1:
+                    x = 100
+                else:
+                    x = c.SCREEN_WIDTH - ann_text.get_width() - 100
+                
+                y = 200 - y_offset
+                
+                # Apply fade
+                ann_text.set_alpha(alpha)
+                self.screen.blit(ann_text, (x, y))
     
     # ==================== GAME OVER STATE ====================
     
@@ -1204,14 +1669,14 @@ class Game:
         pass
     
     def _draw_game_over(self):
-        """Render game over screen"""
+        """Render game over screen with enhanced styling"""
         # Draw faded fight background
         self._draw_fight()
         
-        # Dark overlay
+        # Dark overlay with gradient effect
         overlay = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
-        overlay.set_alpha(200)
-        overlay.fill(c.BLACK)
+        overlay.set_alpha(180)
+        overlay.fill((10, 10, 20))
         self.screen.blit(overlay, (0, 0))
         
         # Determine winner
@@ -1225,24 +1690,37 @@ class Game:
             winner_text = "DOUBLE K.O!"
             color = c.YELLOW
         
-        # Winner announcement
-        winner = self.text_renderer.render(winner_text, 'large', color)
+        # Winner announcement with outlined text
+        winner = self.text_renderer.render_outlined(winner_text, 'large', color, c.BLACK, 4)
         winner_x = c.SCREEN_WIDTH // 2 - winner.get_width() // 2
         winner_bg = pygame.Rect(winner_x - 30, 150, winner.get_width() + 60, 90)
-        pygame.draw.rect(self.screen, c.BLACK, winner_bg)
-        pygame.draw.rect(self.screen, color, winner_bg, 5)
+        draw_panel(self.screen, winner_bg, (20, 20, 30), color, 5)
         self.screen.blit(winner, (winner_x, 170))
         
-        # Subtitle
-        subtitle = self.text_renderer.render("GAME OVER", 'medium', c.WHITE)
+        # Subtitle with outline
+        subtitle = self.text_renderer.render_outlined("GAME OVER", 'medium', c.WHITE, c.BLACK, 2)
         subtitle_x = c.SCREEN_WIDTH // 2 - subtitle.get_width() // 2
         self.screen.blit(subtitle, (subtitle_x, 280))
         
-        # Restart prompt (blinking)
-        if pygame.time.get_ticks() % 1000 < 500:
-            prompt = self.text_renderer.render("PRESS ENTER TO CONTINUE", 'medium', c.YELLOW)
-            prompt_x = c.SCREEN_WIDTH // 2 - prompt.get_width() // 2
-            self.screen.blit(prompt, (prompt_x, 400))
+        # Stats display
+        stats_y = 330
+        p1_stats = self.text_renderer.render(f"P1: {int(max(0, self.p1.health))} HP", 'small', c.RED)
+        p2_stats = self.text_renderer.render(f"P2: {int(max(0, self.p2.health))} HP", 'small', c.BLUE)
+        self.screen.blit(p1_stats, (c.SCREEN_WIDTH // 2 - 100, stats_y))
+        self.screen.blit(p2_stats, (c.SCREEN_WIDTH // 2 + 30, stats_y))
+        
+        # Restart prompt (pulsing effect)
+        pulse = abs((pygame.time.get_ticks() % 1000) - 500) / 500.0
+        alpha = int(128 + 127 * pulse)
+        prompt = self.text_renderer.render_outlined("PRESS ENTER TO CONTINUE", 'medium', c.YELLOW, c.BLACK, 2)
+        prompt.set_alpha(alpha)
+        prompt_x = c.SCREEN_WIDTH // 2 - prompt.get_width() // 2
+        self.screen.blit(prompt, (prompt_x, 400))
+        
+        # ESC to exit hint
+        esc_hint = self.text_renderer.render("ESC to return to menu", 'small', c.GRAY)
+        esc_x = c.SCREEN_WIDTH // 2 - esc_hint.get_width() // 2
+        self.screen.blit(esc_hint, (esc_x, 450))
     
     # ==================== HELPER METHODS ====================
     
@@ -1251,4 +1729,158 @@ class Game:
         for _ in range(5):
             vx = random.uniform(-5, 5)
             vy = random.uniform(-5, -2)
+            self.particles.append(Particle(x, y, color, (vx, vy)))
+    
+    def _update_ai_fighter(self, ai_fighter, target):
+        """
+        Enhanced AI logic for attract mode - aggressive fighting with specials and ultimates.
+        Makes the demo exciting to watch!
+        """
+        current_time = pygame.time.get_ticks()
+        dx = target.rect.centerx - ai_fighter.rect.centerx
+        distance = abs(dx)
+        
+        # Face the opponent
+        ai_fighter.facing_right = dx > 0
+        
+        # Random action selection with weighted probabilities
+        rand = random.random()
+        
+        # ===== ULTIMATE MOVE - Use when meter is full! =====
+        if ai_fighter.super_meter >= c.SUPER_METER_MAX:
+            # High chance to use ultimate when available (exciting for demo!)
+            if rand < 0.15 and distance < 300:
+                # Move toward target first if needed
+                if distance > 100:
+                    if dx > 0:
+                        ai_fighter.rect.x += ai_fighter.speed
+                    else:
+                        ai_fighter.rect.x -= ai_fighter.speed
+                else:
+                    # Execute ultimate!
+                    result = ai_fighter.attack(target, 'ultimate')
+                    if result is not None:
+                        # Handle projectiles from ultimate
+                        if isinstance(result, list):
+                            self.projectiles.extend(result)
+                        elif hasattr(result, 'active'):
+                            if hasattr(result, 'fighter'):  # SpinningKickEffect
+                                self.special_effects.append(result)
+                            else:
+                                self.projectiles.append(result)
+                        # Screen flash for ultimate
+                        self.screen_shake = 15
+                        self.hit_freeze_frames = 8
+        
+        # ===== SPECIAL MOVES - Use frequently for demo =====
+        elif rand < 0.08 and distance < 250:
+            if current_time - ai_fighter.last_special_time >= 3000:  # Faster cooldown for demo
+                result = ai_fighter.attack(target, 'special')
+                if result is not None:
+                    if isinstance(result, list):
+                        self.projectiles.extend(result)
+                    elif hasattr(result, 'active'):
+                        if hasattr(result, 'fighter'):
+                            self.special_effects.append(result)
+                        else:
+                            self.projectiles.append(result)
+        
+        # ===== MOVEMENT & COMBAT =====
+        elif distance > 200:
+            # Move toward target aggressively
+            move_speed = ai_fighter.speed * 0.9
+            if dx > 0:
+                ai_fighter.rect.x += move_speed
+            else:
+                ai_fighter.rect.x -= move_speed
+            
+            # Jump toward opponent sometimes
+            if rand < 0.04 and not ai_fighter.jumping:
+                ai_fighter.vel_y = ai_fighter.jump_force
+                ai_fighter.jumping = True
+        
+        elif distance < 120:
+            # In attack range - be aggressive!
+            if rand < 0.15:
+                # Combo attacks - favor variety
+                attacks = ['light_punch', 'heavy_punch', 'light_kick', 'heavy_kick']
+                # Weight toward heavy attacks for more impact
+                if random.random() < 0.4:
+                    attack = random.choice(['heavy_punch', 'heavy_kick'])
+                else:
+                    attack = random.choice(attacks)
+                ai_fighter.attack(target, attack)
+                
+            elif rand < 0.20:
+                # Jump and attack
+                if not ai_fighter.jumping:
+                    ai_fighter.vel_y = ai_fighter.jump_force
+                    ai_fighter.jumping = True
+                    # Queue an attack
+                    ai_fighter.attack(target, 'heavy_kick')
+                    
+            elif rand < 0.22:
+                # Occasionally block
+                ai_fighter.blocking = True
+                ai_fighter.is_blocking = True
+                
+            elif rand < 0.25:
+                # Dash back then attack
+                if dx > 0:
+                    ai_fighter.rect.x -= ai_fighter.speed * 2
+                else:
+                    ai_fighter.rect.x += ai_fighter.speed * 2
+        
+        # Medium range - approach with attacks
+        else:
+            if rand < 0.06:
+                # Dash in
+                if dx > 0:
+                    ai_fighter.rect.x += ai_fighter.speed * 2
+                else:
+                    ai_fighter.rect.x -= ai_fighter.speed * 2
+            elif rand < 0.10:
+                # Jump in
+                if not ai_fighter.jumping:
+                    ai_fighter.vel_y = ai_fighter.jump_force
+                    ai_fighter.jumping = True
+            else:
+                # Walk toward
+                if dx > 0:
+                    ai_fighter.rect.x += ai_fighter.speed * 0.5
+                else:
+                    ai_fighter.rect.x -= ai_fighter.speed * 0.5
+        
+        # Stop blocking randomly
+        if ai_fighter.blocking and random.random() < 0.15:
+            ai_fighter.blocking = False
+            ai_fighter.is_blocking = False
+        
+        # ===== PHYSICS =====
+        ai_fighter.vel_y += c.GRAVITY
+        ai_fighter.rect.y += ai_fighter.vel_y
+        
+        # Floor collision
+        if ai_fighter.rect.bottom > c.FLOOR_Y:
+            ai_fighter.rect.bottom = c.FLOOR_Y
+            ai_fighter.vel_y = 0
+            ai_fighter.jumping = False
+        
+        # Screen bounds
+        if ai_fighter.rect.left < 0:
+            ai_fighter.rect.left = 0
+        if ai_fighter.rect.right > c.SCREEN_WIDTH:
+            ai_fighter.rect.right = c.SCREEN_WIDTH
+        
+        # ===== SUPER METER BOOST FOR DEMO =====
+        # Give AI fighters extra meter so they use ultimates more often
+        if self.attract_mode:
+            ai_fighter.super_meter = min(c.SUPER_METER_MAX, ai_fighter.super_meter + 0.5)
+    
+    def _spawn_dust_particles(self, x, y):
+        """Spawn dust particles for landing/jumping effects"""
+        for _ in range(8):
+            vx = random.uniform(-3, 3)
+            vy = random.uniform(-1, -0.5)
+            color = (139, 90, 43)  # Dirt brown
             self.particles.append(Particle(x, y, color, (vx, vy)))
